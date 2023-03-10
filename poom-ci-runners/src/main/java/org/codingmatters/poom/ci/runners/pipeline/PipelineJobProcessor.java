@@ -8,10 +8,12 @@ import org.codingmatters.poom.ci.pipeline.api.types.PipelineTrigger;
 import org.codingmatters.poom.ci.pipeline.api.types.StageTermination;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
 import org.codingmatters.poom.ci.pipeline.descriptors.StageHolder;
+import org.codingmatters.poom.ci.runners.pipeline.loggers.ClosableStageLogger;
 import org.codingmatters.poom.ci.runners.pipeline.loggers.DirectStageLogger;
 import org.codingmatters.poom.runner.JobProcessor;
 import org.codingmatters.poom.runner.exception.JobProcessingException;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
+import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.poomjobs.api.types.Job;
 import org.codingmatters.poomjobs.api.types.job.Status;
 
@@ -163,7 +165,7 @@ public class PipelineJobProcessor implements JobProcessor {
 
     private StageTermination.Exit executeStage(PipelineContext context, PipelineExecutor executor, StageHolder stage) throws JobProcessingException {
         log.audit().info("executing pipeline {} stage {}", context.pipelineId(), stage);
-        try(DirectStageLogger stageLogger = this.stageLogListener(context, stage)) {
+        try(ClosableStageLogger stageLogger = this.stageLogListener(context, stage)) {
             this.notifyStageExecutionStart(context, stage);
             StageTermination.Exit status = executor.execute(stage, stageLogger);
             this.notifyStageExecutionEnd(context, stage, status);
@@ -177,8 +179,12 @@ public class PipelineJobProcessor implements JobProcessor {
         }
     }
 
-    private DirectStageLogger stageLogListener(PipelineContext context, StageHolder stage) {
-        return new DirectStageLogger(context.pipelineId(), stage, this.pipelineAPIClient);
+    private ClosableStageLogger stageLogListener(PipelineContext context, StageHolder stage) {
+        if(Env.optional("LOG_TO_PIPELINE").orElse(new Env.Var("false")).asString().equals("true")) {
+            return new DirectStageLogger(context.pipelineId(), stage, this.pipelineAPIClient);
+        } else {
+            return ClosableStageLogger.NOOP;
+        }
     }
 
     private void notifyStageExecutionStart(PipelineContext context, StageHolder stage) throws JobProcessingException {

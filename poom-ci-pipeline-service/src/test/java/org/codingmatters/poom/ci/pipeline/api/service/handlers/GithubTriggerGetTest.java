@@ -3,7 +3,7 @@ package org.codingmatters.poom.ci.pipeline.api.service.handlers;
 import org.codingmatters.poom.ci.pipeline.api.GithubTriggerGetRequest;
 import org.codingmatters.poom.ci.pipeline.api.githubtriggergetresponse.Status200;
 import org.codingmatters.poom.ci.triggers.GithubPushEvent;
-import org.codingmatters.poom.servives.domain.entities.Entity;
+import org.codingmatters.poom.services.domain.entities.Entity;
 import org.junit.Before;
 import org.junit.Test;
 

@@ -6,6 +6,8 @@ import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIHandlersClient;
 import org.codingmatters.poom.ci.pipeline.descriptors.Pipeline;
 import org.codingmatters.poom.ci.pipeline.descriptors.StageHolder;
+import org.codingmatters.poom.services.support.Env;
+import org.codingmatters.poom.services.support.EnvProvider;
 import org.codingmatters.poom.services.tests.Eventually;
 import org.codingmatters.poomjobs.api.types.Job;
 import org.codingmatters.poomjobs.api.types.job.Status;
@@ -139,47 +141,58 @@ public class PipelineJobProcessorTest {
 
     @Test
     public void nominalLogic() throws Exception {
-        Job job = Job.builder()
-                .category("poom-ci").name("pipeline").arguments("pipeline-id")
-                .status(status -> status.run(Status.Run.RUNNING))
-                .processing(processing -> processing.submitted(LocalDateTime.now(ZoneOffset.UTC.normalized()).minus(1, ChronoUnit.MINUTES)))
-                .build();
+        EnvProvider.provider(s -> {
+            if("LOG_TO_PIPELINE".equals(s)) {
+                return "true";
+            } else {
+                return EnvProvider.DEFAULT.apply(s);
+            }
+        });
+        try {
+            Job job = Job.builder()
+                    .category("poom-ci").name("pipeline").arguments("pipeline-id")
+                    .status(status -> status.run(Status.Run.RUNNING))
+                    .processing(processing -> processing.submitted(LocalDateTime.now(ZoneOffset.UTC.normalized()).minus(1, ChronoUnit.MINUTES)))
+                    .build();
 
-        job = new PipelineJobProcessor(job, this.testContextProvider, this::testExecutor, this.pipelineClient).process();
+            job = new PipelineJobProcessor(job, this.testContextProvider, this::testExecutor, this.pipelineClient).process();
 
-        assertThat(this.pipelineGetCalls, hasSize(1));
-        assertThat(this.contextProviderCalls, hasSize(1));
+            assertThat(this.pipelineGetCalls, hasSize(1));
+            assertThat(this.contextProviderCalls, hasSize(1));
 
-        assertThat(this.execInitCount.get(), is(1));
-        assertThat(this.executedStages, contains("stage1", "stage2"));
+            assertThat(this.execInitCount.get(), is(1));
+            assertThat(this.executedStages, contains("stage1", "stage2"));
 
-        assertThat(this.stagePostCalls, hasSize(2));
-        assertThat(this.stagePostCalls.get(0).payload().name(), is("stage1"));
-        assertThat(this.stagePostCalls.get(0).stageType(), is(Stage.StageType.MAIN.name()));
-        assertThat(this.stagePostCalls.get(1).payload().name(), is("stage2"));
-        assertThat(this.stagePostCalls.get(1).stageType(), is(Stage.StageType.MAIN.name()));
+            assertThat(this.stagePostCalls, hasSize(2));
+            assertThat(this.stagePostCalls.get(0).payload().name(), is("stage1"));
+            assertThat(this.stagePostCalls.get(0).stageType(), is(Stage.StageType.MAIN.name()));
+            assertThat(this.stagePostCalls.get(1).payload().name(), is("stage2"));
+            assertThat(this.stagePostCalls.get(1).stageType(), is(Stage.StageType.MAIN.name()));
 
-        assertThat(this.stagePatchCalls, hasSize(2));
-        assertThat(this.stagePatchCalls.get(0).stageName(), is("stage1"));
-        assertThat(this.stagePostCalls.get(0).stageType(), is(Stage.StageType.MAIN.name()));
-        assertThat(this.stagePatchCalls.get(1).stageName(), is("stage2"));
-        assertThat(this.stagePostCalls.get(1).stageType(), is(Stage.StageType.MAIN.name()));
+            assertThat(this.stagePatchCalls, hasSize(2));
+            assertThat(this.stagePatchCalls.get(0).stageName(), is("stage1"));
+            assertThat(this.stagePostCalls.get(0).stageType(), is(Stage.StageType.MAIN.name()));
+            assertThat(this.stagePatchCalls.get(1).stageName(), is("stage2"));
+            assertThat(this.stagePostCalls.get(1).stageType(), is(Stage.StageType.MAIN.name()));
 
-        assertThat(this.pipelinePatchCalls, hasSize(2));
-        assertThat(this.pipelinePatchCalls.get(0).pipelineId(), is("pipeline-id"));
-        assertThat(this.pipelinePatchCalls.get(0).payload(), is(PipelineTermination.builder().run(PipelineTermination.Run.RUNNING).build()));
-        assertThat(this.pipelinePatchCalls.get(1).pipelineId(), is("pipeline-id"));
-        assertThat(this.pipelinePatchCalls.get(1).payload(), is(PipelineTermination.builder().exit(PipelineTermination.Exit.SUCCESS).build()));
+            assertThat(this.pipelinePatchCalls, hasSize(2));
+            assertThat(this.pipelinePatchCalls.get(0).pipelineId(), is("pipeline-id"));
+            assertThat(this.pipelinePatchCalls.get(0).payload(), is(PipelineTermination.builder().run(PipelineTermination.Run.RUNNING).build()));
+            assertThat(this.pipelinePatchCalls.get(1).pipelineId(), is("pipeline-id"));
+            assertThat(this.pipelinePatchCalls.get(1).payload(), is(PipelineTermination.builder().exit(PipelineTermination.Exit.SUCCESS).build()));
 
-        Eventually.timeout(30, TimeUnit.SECONDS).assertThat(() -> {
-            List<String> logs = new LinkedList<>();
-            this.logsPatchCalls.stream().map(request -> request.payload().stream().map(line -> line.content()).collect(Collectors.toList())).forEach(line -> logs.addAll(line));
+            Eventually.timeout(30, TimeUnit.SECONDS).assertThat(() -> {
+                List<String> logs = new LinkedList<>();
+                this.logsPatchCalls.stream().map(request -> request.payload().stream().map(line -> line.content()).collect(Collectors.toList())).forEach(line -> logs.addAll(line));
 
-            System.out.println(logs);
-            return logs;
-        }, contains("stage1 log 1", "stage1 log 2", "stage1 log 3", "stage2 log 1", "stage2 log 2", "stage2 log 3"));
+                System.out.println(logs);
+                return logs;
+            }, contains("stage1 log 1", "stage1 log 2", "stage1 log 3", "stage2 log 1", "stage2 log 2", "stage2 log 3"));
 
-        assertThat(job.status().run(), is(Status.Run.DONE));
-        assertThat(job.status().exit(), is(Status.Exit.SUCCESS));
+            assertThat(job.status().run(), is(Status.Run.DONE));
+            assertThat(job.status().exit(), is(Status.Exit.SUCCESS));
+        } finally {
+            EnvProvider.reset();
+        }
     }
 }

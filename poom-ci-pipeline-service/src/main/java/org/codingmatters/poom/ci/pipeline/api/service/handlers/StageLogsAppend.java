@@ -14,7 +14,7 @@ import org.codingmatters.poom.services.domain.exceptions.RepositoryException;
 import org.codingmatters.poom.services.domain.property.query.PropertyQuery;
 import org.codingmatters.poom.services.domain.repositories.Repository;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
-import org.codingmatters.poom.servives.domain.entities.PagedEntityList;
+import org.codingmatters.poom.services.domain.entities.PagedEntityList;
 import org.codingmatters.rest.api.Processor;
 
 import java.io.IOException;
