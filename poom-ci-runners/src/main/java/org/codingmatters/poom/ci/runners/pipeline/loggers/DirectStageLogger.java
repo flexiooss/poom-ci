@@ -13,7 +13,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-public class DirectStageLogger implements PipelineExecutor.StageLogListener, AutoCloseable {
+public class DirectStageLogger implements ClosableStageLogger {
     static private final CategorizedLogger log = CategorizedLogger.getLogger(DirectStageLogger.class);
     public static final int LOB_BATCH_SIZE = 100;
 
