@@ -21,12 +21,12 @@ import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
-public class PoomCIApiTest extends AbstractPoomCITest {
+public class PoomCIPipelinesApiTest extends AbstractPoomCITest {
 
     private final AtomicReference<JobCollectionPostRequest> lastJobPost = new AtomicReference<>(null);
 
     private PoomjobsJobRegistryAPIClient jobRegistryAPIClient;
-    private PoomCIApi api;
+    private PoomCIPipelinesApi api;
 
     @Override
     @Before
@@ -40,7 +40,7 @@ public class PoomCIApiTest extends AbstractPoomCITest {
                     })
                     .build(),
             Executors.newFixedThreadPool(4));
-        api = new PoomCIApi(this.repository(), "/", new JsonFactory(), this.jobRegistryAPIClient);
+        api = new PoomCIPipelinesApi(this.repository(), "/", new JsonFactory(), this.jobRegistryAPIClient);
     }
 
     @Test

@@ -6,7 +6,10 @@ import com.mongodb.client.MongoClient;
 import io.flexio.docker.DockerResource;
 import io.flexio.services.tests.mongo.MongoResource;
 import io.flexio.services.tests.mongo.MongoTest;
-import org.codingmatters.poom.ci.dependency.api.*;
+import org.codingmatters.poom.ci.dependency.api.PoomCIDependencyAPIDescriptor;
+import org.codingmatters.poom.ci.dependency.api.RepositoriesGetRequest;
+import org.codingmatters.poom.ci.dependency.api.RepositoryGetRequest;
+import org.codingmatters.poom.ci.dependency.api.RepositoryGraphGetRequest;
 import org.codingmatters.poom.ci.dependency.api.types.FullRepository;
 import org.codingmatters.poom.ci.dependency.api.types.Module;
 import org.codingmatters.poom.ci.dependency.api.types.Repository;
@@ -16,19 +19,12 @@ import org.codingmatters.poom.ci.dependency.client.PoomCIDependencyAPIClient;
 import org.codingmatters.poom.ci.dependency.client.PoomCIDependencyAPIRequesterClient;
 import org.codingmatters.poom.ci.dependency.flat.GraphManager;
 import org.codingmatters.poom.ci.dependency.flat.GraphManagerException;
-import org.codingmatters.poom.services.domain.property.query.PropertyQuery;
-import org.codingmatters.rest.api.client.okhttp.HttpClientWrapper;
 import org.codingmatters.rest.api.client.okhttp.OkHttpClientWrapper;
 import org.codingmatters.rest.api.client.okhttp.OkHttpRequesterFactory;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
 import org.junit.*;
 
 import java.io.IOException;
 import java.net.ServerSocket;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -61,7 +57,7 @@ public class DependencyFlatServiceTest {
         );
         int port = this.unusedPort();
         this.service = new DependencyFlatService(graphManager, "localhost", port, this.jsonFactory);
-        this.service.start();
+        this.service.runtime().handle().start();
 
         String url = "http://localhost:" + port + "/" + PoomCIDependencyAPIDescriptor.NAME;
         this.dependencies = new PoomCIDependencyAPIRequesterClient(new OkHttpRequesterFactory(OkHttpClientWrapper.build(), () -> url),
@@ -77,7 +73,7 @@ public class DependencyFlatServiceTest {
 
     @After
     public void tearDown() throws Exception {
-        this.service.stop();
+        this.service.runtime().handle().stop();
     }
 
     @Test

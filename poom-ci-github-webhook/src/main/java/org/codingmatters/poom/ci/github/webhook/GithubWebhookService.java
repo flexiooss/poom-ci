@@ -9,6 +9,9 @@ import org.codingmatters.poom.ci.github.webhook.api.service.GithubWebhookAPIProc
 import org.codingmatters.poom.ci.github.webhook.handlers.GithubWebhook;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIRequesterClient;
+import org.codingmatters.poom.containers.ApiContainerRuntime;
+import org.codingmatters.poom.containers.ApiContainerRuntimeBuilder;
+import org.codingmatters.poom.containers.runtime.netty.NettyApiContainerRuntime;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.rest.api.RequestDelegate;
@@ -36,6 +39,7 @@ public class GithubWebhookService {
     private final PathHandler handlers;
     private final JsonFactory jsonFactory;
     private final int port;
+    private final ApiContainerRuntime runtime;
 
     private Undertow server;
     private final PoomCIPipelineAPIClient pipelineClient;
@@ -55,18 +59,8 @@ public class GithubWebhookService {
                 new OkHttpRequesterFactory(OkHttpClientWrapper.build(), () -> pipelineUrl),
                 jsonFactory,
                 pipelineUrl);
-        new GithubWebhookService(host, port, token, jsonFactory, pipelineClient).start();
-
-        log.info("started...");
-
-        while(true) {
-            try {
-                Thread.sleep(10000);
-            } catch (InterruptedException e) {
-                log.info("stopping service");
-                System.exit(1);
-            }
-        }
+        ApiContainerRuntime runtime = new GithubWebhookService(host, port, token, jsonFactory, pipelineClient).runtime();
+        runtime.main();
     }
 
     public GithubWebhookService(String host, int port, String token, JsonFactory jsonFactory, PoomCIPipelineAPIClient pipelineClient) {
@@ -77,20 +71,20 @@ public class GithubWebhookService {
         this.pipelineClient = pipelineClient;
         this.handlers = Handlers.path();
 
-        this.handlers.addExactPath(
-                "/github/webhook",
-                new CdmHttpUndertowHandler(
+        this.runtime  = new ApiContainerRuntimeBuilder()
+                .apiProcessorWrapper(processor ->
                         new GithubWebhookGuard(
                                 new GithubEventFilter(this::notImplementedEvent)
-                                        .with("push",
-                                                new GithubWebhookAPIProcessor(
-                                                        "/github/webhook",
-                                                        this.jsonFactory,
-                                                        this.webhookHandlers())
-                                        )
+                                        .with("push", processor)
                                         .with("ping", this::pong),
                                 this.token)
-                ));
+                )
+                .withApi(new GithubWebhookApi(this.pipelineClient, prefixToTignore, this.jsonFactory))
+                .build(new NettyApiContainerRuntime(host, port, log));
+    }
+
+    public ApiContainerRuntime runtime() {
+        return this.runtime;
     }
 
     private void pong(RequestDelegate request, ResponseDelegate response) {
@@ -127,23 +121,5 @@ public class GithubWebhookService {
                     log.tokenized().error("error reading request payload", e)
             );
         }
-    }
-
-    private GithubWebhookAPIHandlers webhookHandlers() {
-        return new GithubWebhookAPIHandlers.Builder()
-                .webhookPostHandler(new GithubWebhook(this.pipelineClient, prefixToTignore))
-                .build();
-    }
-
-    public void start() {
-        this.server = Undertow.builder()
-                .addHttpListener(this.port, this.host)
-                .setHandler(this.handlers)
-                .build();
-        this.server.start();
-    }
-
-    public void stop() {
-        this.server.stop();
     }
 }

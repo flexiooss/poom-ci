@@ -59,17 +59,10 @@ public class PoomCIApisService {
                 clientPool
         );
 
-        ApiContainerRuntime runtime;
-        if(Env.optional("RUNTIME").orElse(new Env.Var(NettyApiContainerRuntime.class.getName())).asString().equals(NettyApiContainerRuntime.class.getName())) {
-            runtime = new NettyApiContainerRuntime(host, port, log);
-        } else {
-            runtime = new UndertowApiContainerRuntime(host, port, log);
-        }
-        runtime = new ApiContainerRuntimeBuilder()
+        ApiContainerRuntime runtime = new ApiContainerRuntimeBuilder()
                 .withApi(jobRegistryAPI(runnerRegistryClient, clientPool, jsonFactory, OkHttpClientWrapper.build()))
                 .withApi(runnerRegistryAPI)
-                .build(runtime);
-
+                .build(new NettyApiContainerRuntime(host, port, log));
         log.info("poom-ci pipeline api service running");
         runtime.main();
     }

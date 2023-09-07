@@ -67,6 +67,14 @@
             <groupId>org.codingmatters.rest</groupId>
             <artifactId>cdm-rest-client-okhttp</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.codingmatters.poom.containers</groupId>
+            <artifactId>poom-services-containers-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.codingmatters.poom.containers.netty</groupId>
+            <artifactId>poom-services-containers-netty-runtime</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.codingmatters.poom</groupId>
