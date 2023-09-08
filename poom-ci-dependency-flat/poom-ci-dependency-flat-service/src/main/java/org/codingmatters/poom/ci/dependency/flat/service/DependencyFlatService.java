@@ -16,10 +16,14 @@ import org.codingmatters.poom.ci.dependency.flat.domain.spec.ProducesRelation;
 import org.codingmatters.poom.ci.dependency.flat.domain.spec.mongo.DependsOnRelationMongoMapper;
 import org.codingmatters.poom.ci.dependency.flat.domain.spec.mongo.ProducesRelationMongoMapper;
 import org.codingmatters.poom.ci.dependency.flat.handlers.FlatDependencyHandlersBuilder;
+import org.codingmatters.poom.containers.ApiContainerRuntime;
+import org.codingmatters.poom.containers.ApiContainerRuntimeBuilder;
+import org.codingmatters.poom.containers.runtime.netty.NettyApiContainerRuntime;
 import org.codingmatters.poom.services.domain.property.query.PropertyQuery;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.rest.api.Processor;
+import org.codingmatters.rest.api.client.okhttp.OkHttpClientWrapper;
 import org.codingmatters.rest.undertow.CdmHttpUndertowHandler;
 
 public class DependencyFlatService {
@@ -28,57 +32,22 @@ public class DependencyFlatService {
     static private final String NAME = "dependency flat service";
     private static final String DEPENDENCY_DB = "DEPENDENCY_DB";
 
-    private final GraphManager graphManager;
-    private final String host;
-    private final int port;
-    private final JsonFactory jsonFactory;
+    private final ApiContainerRuntime runtime;
 
-    private final Undertow server;
 
     public DependencyFlatService(GraphManager graphManager, String host, int port, JsonFactory jsonFactory) {
-        this.graphManager = graphManager;
-        this.host = host;
-        this.port = port;
-        this.jsonFactory = jsonFactory;
-
-        this.server = Undertow.builder()
-                .addHttpListener(this.port, this.host)
-                .setHandler(new CdmHttpUndertowHandler(this.processor()))
-                .build();
+        this.runtime = new ApiContainerRuntimeBuilder()
+                .withApi(new DependencyFlatApi(graphManager, jsonFactory))
+                .build(new NettyApiContainerRuntime(host, port, log));
     }
 
-    private Processor processor() {
-        return new PoomCIDependencyAPIProcessor(
-                "/" + PoomCIDependencyAPIDescriptor.NAME,
-                this.jsonFactory,
-                new FlatDependencyHandlersBuilder(this.graphManager).build()
-        );
-    }
-
-    public void start() {
-        log.info("starting " + NAME + "...");
-        this.server.start();
-        log.info(NAME + " started.");
-    }
-
-    public void stop() {
-        log.info("stopping " + NAME + "...");
-        this.server.stop();
-        log.info(NAME + " stopped.");
+    public ApiContainerRuntime runtime() {
+        return runtime;
     }
 
     public static void main(String[] args) {
         DependencyFlatService service = fromEnv();
-
-        service.start();
-        while(true) {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                break;
-            }
-        }
-        service.stop();
+        service.runtime().main();
     }
 
     private static DependencyFlatService fromEnv() {

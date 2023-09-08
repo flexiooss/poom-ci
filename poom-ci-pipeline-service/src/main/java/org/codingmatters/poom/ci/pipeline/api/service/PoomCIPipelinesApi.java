@@ -2,22 +2,27 @@ package org.codingmatters.poom.ci.pipeline.api.service;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import org.codingmatters.poom.ci.pipeline.api.PipelinesPostRequest;
+import org.codingmatters.poom.ci.pipeline.api.PoomCIPipelineAPIDescriptor;
 import org.codingmatters.poom.ci.pipeline.api.PoomCIPipelineAPIHandlers;
 import org.codingmatters.poom.ci.pipeline.api.service.handlers.*;
 import org.codingmatters.poom.ci.pipeline.api.service.repository.PoomCIRepository;
 import org.codingmatters.poom.ci.pipeline.api.types.Pipeline;
 import org.codingmatters.poom.ci.pipeline.api.types.PipelineTrigger;
-import org.codingmatters.poomjobs.api.JobCollectionGetRequest;
+import org.codingmatters.poom.containers.ApiContainerRuntimeBuilder;
+import org.codingmatters.poom.containers.runtime.netty.NettyApiContainerRuntime;
 import org.codingmatters.poomjobs.client.PoomjobsJobRegistryAPIClient;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poomjobs.api.JobCollectionPostResponse;
+import org.codingmatters.rest.api.Api;
 import org.codingmatters.rest.api.Processor;
 
 import java.io.IOException;
 
-public class PoomCIApi {
+public class PoomCIPipelinesApi implements Api {
 
-    static private CategorizedLogger log = CategorizedLogger.getLogger(PoomCIApi.class);
+    private static final String VERSION = Api.versionFrom(PoomCIPipelinesApi.class);
+
+    static private CategorizedLogger log = CategorizedLogger.getLogger(PoomCIPipelinesApi.class);
 
     private final PoomCIRepository repository;
     private final String apiPath;
@@ -28,7 +33,7 @@ public class PoomCIApi {
     private PoomCIPipelineAPIProcessor processor;
 
 
-    public PoomCIApi(PoomCIRepository repository, String apiPath, JsonFactory jsonFactory, PoomjobsJobRegistryAPIClient jobRegistryAPIClient) {
+    public PoomCIPipelinesApi(PoomCIRepository repository, String apiPath, JsonFactory jsonFactory, PoomjobsJobRegistryAPIClient jobRegistryAPIClient) {
         this.repository = repository;
         this.apiPath = apiPath;
         this.jsonFactory = jsonFactory;
@@ -60,7 +65,6 @@ public class PoomCIApi {
                 .pipelineStageLogsPatchHandler(new StageLogsAppend(this.repository))
 
                 .build();
-
         this.processor = new PoomCIPipelineAPIProcessor(this.apiPath, this.jsonFactory, this.handlers);
     }
 
@@ -95,11 +99,23 @@ public class PoomCIApi {
         return this.handlers;
     }
 
+    @Override
+    public String name() {
+        return PoomCIPipelineAPIDescriptor.NAME;
+    }
+
+    @Override
+    public String version() {
+        return VERSION;
+    }
+
+    @Override
     public Processor processor() {
         return this.processor;
     }
 
+    @Override
     public String path() {
-        return apiPath;
+        return this.apiPath;
     }
 }

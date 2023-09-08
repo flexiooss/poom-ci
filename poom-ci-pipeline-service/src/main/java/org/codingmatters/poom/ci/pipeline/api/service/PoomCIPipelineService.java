@@ -18,6 +18,9 @@ import org.codingmatters.poom.ci.triggers.GithubPushEvent;
 import org.codingmatters.poom.ci.triggers.UpstreamBuild;
 import org.codingmatters.poom.ci.triggers.mongo.GithubPushEventMongoMapper;
 import org.codingmatters.poom.ci.triggers.mongo.UpstreamBuildMongoMapper;
+import org.codingmatters.poom.containers.ApiContainerRuntime;
+import org.codingmatters.poom.containers.ApiContainerRuntimeBuilder;
+import org.codingmatters.poom.containers.runtime.netty.NettyApiContainerRuntime;
 import org.codingmatters.poom.services.domain.property.query.PropertyQuery;
 import org.codingmatters.poom.services.domain.repositories.Repository;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
@@ -39,27 +42,17 @@ public class PoomCIPipelineService {
         String database = Env.mandatory(PIPELINES_DB).asString();
 
         try(RepositoryLogStore logStore = new RepositoryLogStore(stagelogRepository(mongoClient, database))) {
-
             PoomCIPipelineService service = new PoomCIPipelineService(api(logStore, mongoClient, database), port, host);
-            service.start();
-
-            log.info("poom-ci pipeline api service running");
-            while (true) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-            log.info("poom-ci pipeline api service stopping...");
-            service.stop();
+            service.runtime().main();
         } catch (Exception e) {
             log.error("error terminating log store", e);
+            System.exit(5);
         }
         log.info("poom-ci pipeline api service stopped.");
+        System.exit(0);
     }
 
-    static public PoomCIApi api(LogStore logStore, MongoClient mongoClient, String database) {
+    static public PoomCIPipelinesApi api(LogStore logStore, MongoClient mongoClient, String database) {
         JsonFactory jsonFactory = new JsonFactory();
 
         PoomCIRepository repository = new PoomCIRepository(
@@ -70,33 +63,21 @@ public class PoomCIPipelineService {
                 pipelineStageRepository(mongoClient, database)
         );
         String jobRegistryUrl = Env.mandatory("JOB_REGISTRY_URL").asString();
-        return new PoomCIApi(repository, "/pipelines", jsonFactory, new PoomjobsJobRegistryAPIRequesterClient(
+        return new PoomCIPipelinesApi(repository, "/pipelines", jsonFactory, new PoomjobsJobRegistryAPIRequesterClient(
                 new OkHttpRequesterFactory(OkHttpClientWrapper.build(), () -> jobRegistryUrl), jsonFactory, jobRegistryUrl)
         );
     }
 
-    private final PoomCIApi api;
+    private final ApiContainerRuntime runtime;
 
-    private Undertow server;
-    private final int port;
-    private final String host;
-
-    public PoomCIPipelineService(PoomCIApi api, int port, String host) {
-        this.port = port;
-        this.host = host;
-        this.api = api;
+    public PoomCIPipelineService(PoomCIPipelinesApi api, int port, String host) {
+        this.runtime = new ApiContainerRuntimeBuilder()
+                .withApi(api)
+                .build(new NettyApiContainerRuntime(host, port, log));
     }
 
-    public void start() {
-        this.server = Undertow.builder()
-                .addHttpListener(this.port, this.host)
-                .setHandler(new CdmHttpUndertowHandler(this.api.processor()))
-                .build();
-        this.server.start();
-    }
-
-    public void stop() {
-        this.server.stop();
+    public ApiContainerRuntime runtime() {
+        return runtime;
     }
 
 
