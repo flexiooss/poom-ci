@@ -60,7 +60,7 @@ public class PoomCIApisService {
         );
 
         ApiContainerRuntime runtime = new ApiContainerRuntimeBuilder()
-                .withApi(jobRegistryAPI(runnerRegistryClient, clientPool, jsonFactory, OkHttpClientWrapper.build()))
+                .withApi(jobRegistryAPI(runnerRegistryClient, jsonFactory, OkHttpClientWrapper.build()))
                 .withApi(runnerRegistryAPI)
                 .build(new NettyApiContainerRuntime(host, port, log));
         log.info("poom-ci pipeline api service running");
@@ -82,7 +82,7 @@ public class PoomCIApisService {
 
     static public PoomjobsJobRegistryAPI jobRegistryAPI(
             PoomjobsRunnerRegistryAPIClient runnerClient,
-            ExecutorService clientPool, JsonFactory jsonFactory, HttpClientWrapper client) {
+            JsonFactory jsonFactory, HttpClientWrapper client) {
         Repository<JobValue, PropertyQuery> jobRepository;
         if(MongoProvider.isAvailable()) {
             jobRepository = JobRepository.createMongo(
