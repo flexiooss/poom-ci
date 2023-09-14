@@ -158,6 +158,29 @@ public class App {
                     notifier.notifyError("propagate-versions", "FAILURE", e);
                     System.exit(3);
                 }
+            } else if (arguments.arguments().get(0).equals("build")) {
+                if (arguments.argumentCount() < 1) {
+                    usageAndFail(args);
+                }
+                try {
+                    List<RepositoryGraphDescriptor> descriptorList = buildFilteredGraphDescriptorList(arguments);
+                    System.out.println("Will propagate develop version for dependency graph : " + descriptorList);
+
+                    GraphTaskResult result = new BuildGraphTask(descriptorList, Optional.ofNullable(arguments.option("branch").get()), commandHelper, client, workspace, notifier, GithubRepositoryUrlProvider.ssh(), graphTaskListener).call();
+
+                    System.out.println("\n\n\n\n####################################################################################");
+                    System.out.println("####################################################################################");
+                    System.out.printf("%s, propagated versions are :\n", result.message());
+                    System.out.println(result.propagationContext().text());
+                    System.out.println("####################################################################################");
+                    System.out.println("####################################################################################\n\n");
+
+                    System.exit(0);
+                } catch (Exception e) {
+                    log.error("failed executing release-graph", e);
+                    notifier.notifyError("propagate-versions", "FAILURE", e);
+                    System.exit(3);
+                }
             } else {
                 usageAndFail(args);
             }
@@ -225,6 +248,10 @@ public class App {
         where.println("      releases repository graphs");
         where.println("      --from   : using the from option, one can start releasing from one point in the graph");
         where.println("   propagate-versions {--from <repo name>} {--branch <branch name, defaults to develop>} <graph files>");
+        where.println("      propagate versions in the repository graphs (version from preceding repos are propagated to following)");
+        where.println("      --from   : using the from option, one can start propagating from one point in the graph");
+        where.println("      --branch : by default, repos develop branch are used, one can change the branch using this option");
+        where.println("   build {--from <repo name>} {--branch <branch name, defaults to develop>} <graph files>");
         where.println("      propagate versions in the repository graphs (version from preceding repos are propagated to following)");
         where.println("      --from   : using the from option, one can start propagating from one point in the graph");
         where.println("      --branch : by default, repos develop branch are used, one can change the branch using this option");

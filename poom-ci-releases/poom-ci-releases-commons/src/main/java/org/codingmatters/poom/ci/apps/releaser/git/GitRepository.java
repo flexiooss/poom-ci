@@ -37,4 +37,20 @@ public class GitRepository {
                 ;
         this.commandHelper.exec(processBuilder, "git commit -am \"" + message + "\"");
     }
+
+    public void emptyCommit(String message) throws CommandFailed {
+        ProcessBuilder processBuilder = new ProcessBuilder()
+                .directory(this.repository)
+                .command("git", "commit", "--allow-empty", "-m", message)
+                ;
+        this.commandHelper.exec(processBuilder, "git commit --allow-empty -m \"" + message + "\"");
+    }
+
+    public void push() throws CommandFailed {
+        ProcessBuilder processBuilder = new ProcessBuilder()
+                .directory(this.repository)
+                .command("git", "push")
+                ;
+        this.commandHelper.exec(processBuilder, "git push");
+    }
 }
