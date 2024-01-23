@@ -49,6 +49,8 @@ public class PoomCIRunner {
                 keystore, Env.mandatory("KS_KEY_PASS").asString().toCharArray()
         ).buildConfiguration();
 
+
+
         GenericRunner runner = new GenericRunner(configuration);
         try {
             runner.start();

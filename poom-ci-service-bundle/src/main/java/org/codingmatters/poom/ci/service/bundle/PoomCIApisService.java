@@ -80,7 +80,7 @@ public class PoomCIApisService {
         return new PoomjobsRunnerRegistryAPI(runnerRepository, jsonFactory);
     }
 
-    static public PoomjobsJobRegistryAPI jobRegistryAPI(
+    static public Api jobRegistryAPI(
             PoomjobsRunnerRegistryAPIClient runnerClient,
             JsonFactory jsonFactory, HttpClientWrapper client) {
         Repository<JobValue, PropertyQuery> jobRepository;

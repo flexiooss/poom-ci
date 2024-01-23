@@ -1,9 +1,7 @@
 package org.codingmatters.poom.ci.apps.releaser;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import org.codingmatters.poom.ci.pipeline.api.PipelinesGetRequest;
-import org.codingmatters.poom.ci.pipeline.api.PipelinesGetResponse;
-import org.codingmatters.poom.ci.pipeline.api.ValueList;
+import org.codingmatters.poom.ci.pipeline.api.*;
 import org.codingmatters.poom.ci.pipeline.api.types.Pipeline;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIRequesterClient;
@@ -66,9 +64,19 @@ public class RepositoryPipeline {
         }
     }
 
-
-
-
+    public Optional<Pipeline> updated(Pipeline pipe) {
+        try {
+            PipelineGetResponse response = this.client.pipelines().pipeline().get(PipelineGetRequest.builder().pipelineId(pipe.id()).build());
+            if (response.opt().status200().isPresent()) {
+                return Optional.of(response.status200().payload());
+            } else {
+                System.out.printf("pipeline not found % !\n", pipe.id());
+                return Optional.empty();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static void main(String[] args) {
         String pipelineUrl = "https://pipelines.ci.flexio.io/pipelines";
@@ -93,5 +101,4 @@ public class RepositoryPipeline {
             e.printStackTrace();
         }
     }
-
 }
