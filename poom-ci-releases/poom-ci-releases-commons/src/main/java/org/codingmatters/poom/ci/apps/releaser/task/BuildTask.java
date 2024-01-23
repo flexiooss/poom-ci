@@ -112,7 +112,7 @@ public class BuildTask implements Callable<ReleaseTaskResult> {
         System.out.printf("waiting for pipeline %s to finish...\n", pipe.get().opt().id().orElse("NONE"));
         while (!pipe.get().opt().status().run().orElse(Status.Run.PENDING).equals(Status.Run.DONE)) {
             Thread.sleep(2000L);
-            pipe = pipeline.last(start);
+            pipe = pipeline.updated(pipe.get());
         }
     }
 }

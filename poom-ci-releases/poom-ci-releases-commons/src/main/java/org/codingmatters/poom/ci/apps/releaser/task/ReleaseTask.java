@@ -56,7 +56,7 @@ public class ReleaseTask implements Callable<ReleaseTaskResult> {
         System.out.println("waiting for release pipeline to finish...");
         while (!pipe.get().opt().status().run().orElse(Status.Run.PENDING).equals(Status.Run.DONE)) {
             Thread.sleep(2000L);
-            pipe = pipeline.last(start);
+            pipe = pipeline.updated(pipe.get());
         }
 
         if (pipe.get().status().exit().equals(Status.Exit.SUCCESS)) {
