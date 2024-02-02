@@ -31,7 +31,8 @@ public class ReleaseGraphTask extends AbstractGraphTask implements Callable<Grap
 
     @Override
     public GraphTaskResult call() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(10);
+//        ExecutorService pool = Executors.newFixedThreadPool(WALKER_THREAD_COUNT);
+        ExecutorService pool = Executors.newCachedThreadPool();
         try {
             log.info("starting release-graph for {}", this.descriptorList);
             notifier.notify("release-graph", "START", this.formattedRepositoryList(descriptorList));

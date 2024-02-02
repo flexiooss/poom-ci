@@ -35,7 +35,8 @@ public class PropagateGraphVersionsTask extends AbstractGraphTask implements Cal
 
     @Override
     public GraphTaskResult call() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(10);
+//        ExecutorService pool = Executors.newFixedThreadPool(WALKER_THREAD_COUNT);
+        ExecutorService pool = Executors.newCachedThreadPool();
         try {
             log.info("starting propagate-versions for {}", this.descriptorList);
             notifier.notify("propagate-versions", "START", formattedRepositoryList(descriptorList));
