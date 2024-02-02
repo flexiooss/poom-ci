@@ -73,18 +73,27 @@ public class GraphWalker implements Callable<GraphWalkResult> {
     }
 
     private void waitFor(List<Future<GraphWalkResult>> subtasks) {
-        List<Future<GraphWalkResult>>  remaining = new LinkedList<>(subtasks);
+        List<Future<GraphWalkResult>> remaining = new LinkedList<>(subtasks);
         while(! remaining.isEmpty()) {
             List<Future<GraphWalkResult>> done = new LinkedList<>();
             for (Future<GraphWalkResult> future : remaining) {
-                if(future.isDone()) {
+                try {
+                    future.get(1000, TimeUnit.MILLISECONDS);
                     done.add(future);
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    System.out.printf("task not yet terminated...\n");
                 }
+//                if(future.isDone() || future.isCancelled()) {
+//                    done.add(future);
+//                }
             }
             remaining.removeAll(done);
+            System.out.printf("%s subtasks just terminated, %s still running\n", done.size(), remaining.size());
             if(! remaining.isEmpty()) {
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
