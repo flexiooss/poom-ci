@@ -35,7 +35,8 @@ public class BuildGraphTask extends AbstractGraphTask implements Callable<GraphT
 
     @Override
     public GraphTaskResult call() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(10);
+//        ExecutorService pool = Executors.newFixedThreadPool(WALKER_THREAD_COUNT);
+        ExecutorService pool = Executors.newCachedThreadPool();
         try {
             log.info("starting build for {}", this.descriptorList);
             notifier.notify("build", "START", formattedRepositoryList(descriptorList));

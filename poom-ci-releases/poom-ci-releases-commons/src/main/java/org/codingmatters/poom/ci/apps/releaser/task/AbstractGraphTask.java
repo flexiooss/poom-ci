@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 public class AbstractGraphTask {
+    static public final int WALKER_THREAD_COUNT = 10;
+
     protected final List<RepositoryGraphDescriptor> descriptorList;
     protected final CommandHelper commandHelper;
     protected final PoomCIPipelineAPIClient client;

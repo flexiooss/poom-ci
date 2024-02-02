@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasSize;
 
 public class GraphWalkerTest {
 
@@ -36,6 +37,24 @@ public class GraphWalkerTest {
         System.out.println(this.repos);
 
         assertThat(this.repos, containsInAnyOrder("url-1","url-2" , "url-3" , "url-7" , "url-4" , "url-6" , "url-5"));
+    }
+    @Test
+    public void givenGraphIsHighlyParrallel_whenLessThreadThanParralelRepos__thenAllNodesAreVisited() throws Exception {
+//        ExecutorService pool = Executors.newFixedThreadPool(30);
+        ExecutorService pool = Executors.newCachedThreadPool();
+        RepositoryGraphDescriptor repositoryGraph = RepositoryGraphDescriptor.fromYaml(Thread.currentThread().getContextClassLoader().getResourceAsStream("graphs/high-parralellity-graph.yml"));
+        GraphWalker walker = new GraphWalker(
+                repositoryGraph,
+                new PropagationContext(),
+                this::walkerTask,
+                pool
+        );
+
+        GraphWalkResult result = pool.submit(walker).get();
+        System.out.println(result);
+        System.out.println(this.repos);
+
+        assertThat(this.repos, hasSize(15));
     }
     @Test
     public void whenGraphRootDoesntHaveRepositories__thenThenBranchAreWalked() throws Exception {
@@ -64,8 +83,10 @@ public class GraphWalkerTest {
         return new Callable<ReleaseTaskResult>() {
             @Override
             public ReleaseTaskResult call() throws Exception {
+                System.out.printf("start %s...\n", repository);
                 Thread.sleep(500);
                 repos.add(repository);
+                System.out.printf("end %s.\n", repository);
                 return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, repository, new ArtifactCoordinates(repository, repository, "1.2.3"));
             }
         };

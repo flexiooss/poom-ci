@@ -1,0 +1,32 @@
+---
+then:
+  - repositories:
+      - url-1
+  - repositories:
+      - url-2
+  - repositories:
+      - url-3
+  - repositories:
+      - url-4
+  - repositories:
+      - url-5
+  - repositories:
+      - url-6
+  - repositories:
+      - url-7
+  - repositories:
+      - url-8
+  - repositories:
+      - url-9
+  - repositories:
+      - url-10
+  - repositories:
+      - url-11
+  - repositories:
+      - url-12
+  - repositories:
+      - url-13
+  - repositories:
+      - url-14
+  - repositories:
+      - url-15

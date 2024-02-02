@@ -4,6 +4,7 @@ import org.codingmatters.poom.ci.apps.releaser.graph.descriptors.RepositoryGraph
 import org.codingmatters.poom.ci.apps.releaser.graph.descriptors.RepositoryGraphDescriptor;
 import org.codingmatters.poom.ci.apps.releaser.task.ReleaseTaskResult;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -47,8 +48,14 @@ public class GraphWalker implements Callable<GraphWalkResult> {
 
         List<Future<GraphWalkResult>> subtasks = new LinkedList<>();
         if(root.opt().then().isPresent()) {
+            List<GraphWalker> walkers = new LinkedList<>();
             for (RepositoryGraph graph : root.then()) {
-                subtasks.add(this.pool.submit(new GraphWalker(new RepositoryGraphDescriptor(graph), this.propagationContext, this.walkerTaskProvider, this.pool)));
+
+                GraphWalker walker = new GraphWalker(new RepositoryGraphDescriptor(graph), this.propagationContext, this.walkerTaskProvider, this.pool);
+//                walkers.add(walker);
+                Future<GraphWalkResult> task = this.pool.submit(walker);
+                subtasks.add(task);
+                System.out.printf("submitted %s\n", task);
             }
         }
         System.out.printf("graph has %s subtasks\n", subtasks.size());
@@ -85,12 +92,10 @@ public class GraphWalker implements Callable<GraphWalkResult> {
                 } catch (TimeoutException e) {
                     System.out.printf("task not yet terminated...\n");
                 }
-//                if(future.isDone() || future.isCancelled()) {
-//                    done.add(future);
-//                }
             }
             remaining.removeAll(done);
             System.out.printf("%s subtasks just terminated, %s still running\n", done.size(), remaining.size());
+            System.out.printf("\t%s\n", subtasks);
             if(! remaining.isEmpty()) {
                 try {
                     Thread.sleep(1000);
