@@ -7,10 +7,7 @@ import org.codingmatters.poom.ci.apps.releaser.task.ReleaseTaskResult;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 public class GraphWalker implements Callable<GraphWalkResult> {
     public interface WalkerTaskProvider {
@@ -54,12 +51,16 @@ public class GraphWalker implements Callable<GraphWalkResult> {
                 subtasks.add(this.pool.submit(new GraphWalker(new RepositoryGraphDescriptor(graph), this.propagationContext, this.walkerTaskProvider, this.pool)));
             }
         }
+        System.out.printf("graph has %s subtasks\n", subtasks.size());
+        this.waitFor(subtasks);
+        System.out.printf("graph %s subtasks done.\n", subtasks.size());
 
         boolean failures = false;
         StringBuilder failureMessages = new StringBuilder();
+        int i = 0;
         for (Future<GraphWalkResult> subtask : subtasks) {
             GraphWalkResult result = subtask.get();
-            if(! result.exitStatus().equals(ReleaseTaskResult.ExitStatus.SUCCESS    )) {
+            if(! result.exitStatus().equals(ReleaseTaskResult.ExitStatus.SUCCESS)) {
                 failures = true;
                 failureMessages.append("- ").append(result.message()).append("\n");
             }
@@ -68,6 +69,35 @@ public class GraphWalker implements Callable<GraphWalkResult> {
             return Optional.of(new GraphWalkResult(ReleaseTaskResult.ExitStatus.FAILURE, failureMessages.toString()));
         } else {
             return Optional.empty();
+        }
+    }
+
+    private void waitFor(List<Future<GraphWalkResult>> subtasks) {
+        List<Future<GraphWalkResult>> remaining = new LinkedList<>(subtasks);
+        while(! remaining.isEmpty()) {
+            List<Future<GraphWalkResult>> done = new LinkedList<>();
+            for (Future<GraphWalkResult> future : remaining) {
+                try {
+                    future.get(1000, TimeUnit.MILLISECONDS);
+                    done.add(future);
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                } catch (TimeoutException e) {
+                    System.out.printf("task not yet terminated...\n");
+                }
+//                if(future.isDone() || future.isCancelled()) {
+//                    done.add(future);
+//                }
+            }
+            remaining.removeAll(done);
+            System.out.printf("%s subtasks just terminated, %s still running\n", done.size(), remaining.size());
+            if(! remaining.isEmpty()) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
     }
 }

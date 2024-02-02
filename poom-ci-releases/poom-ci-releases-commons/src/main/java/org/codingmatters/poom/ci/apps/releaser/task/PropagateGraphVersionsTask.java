@@ -42,8 +42,14 @@ public class PropagateGraphVersionsTask extends AbstractGraphTask implements Cal
             GraphWalker.WalkerTaskProvider walkerTaskProvider = (repository, context) -> new PropagateVersionsTask(repository, this.githubRepositoryUrlProvider, branch, context, commandHelper, client, workspace);
 
             PropagationContext propagationContext = new PropagationContext();
+
+            int i = 0;
+            System.out.printf("propagating versions for %s graphs\n", descriptorList.size());
             for (RepositoryGraphDescriptor descriptor : descriptorList) {
+                System.out.printf("propagating versions for graph %s/%s...\n", i, descriptorList.size());
                 walkGraph(descriptor, propagationContext, pool, walkerTaskProvider);
+                System.out.printf("propagated versions for graph %s/%s.\n", i, descriptorList.size());
+                i++;
             }
 
             notifier.notify("propagate-versions", "DONE", propagationContext.text());
