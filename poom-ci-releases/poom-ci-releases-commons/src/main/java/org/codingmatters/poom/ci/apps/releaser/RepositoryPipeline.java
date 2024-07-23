@@ -70,7 +70,7 @@ public class RepositoryPipeline {
             if (response.opt().status200().isPresent()) {
                 return Optional.of(response.status200().payload());
             } else {
-                System.out.printf("pipeline not found % !\n", pipe.id());
+                System.out.printf("pipeline not found %s !\n", pipe.id());
                 return Optional.empty();
             }
         } catch (IOException e) {
