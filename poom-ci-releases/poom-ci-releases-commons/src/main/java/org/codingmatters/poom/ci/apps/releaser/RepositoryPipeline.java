@@ -65,16 +65,26 @@ public class RepositoryPipeline {
     }
 
     public Optional<Pipeline> updated(Pipeline pipe) {
-        try {
-            PipelineGetResponse response = this.client.pipelines().pipeline().get(PipelineGetRequest.builder().pipelineId(pipe.id()).build());
-            if (response.opt().status200().isPresent()) {
-                return Optional.of(response.status200().payload());
-            } else {
-                System.out.printf("pipeline not found %s !\n", pipe.id());
-                return Optional.empty();
+        int tryCount = 0;
+        PipelineGetResponse response = null;
+        while(response == null) {
+            try {
+                response = this.client.pipelines().pipeline().get(PipelineGetRequest.builder().pipelineId(pipe.id()).build());
+            } catch (IOException e) {
+                tryCount++;
+                if(tryCount >= 10) throw new RuntimeException("while waiting for pipeline retry count exceeded");
+                try {
+                    Thread.sleep(5 * 1000L);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException("unexpected exception waiting for pipeline to start", ex);
+                }
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        }
+        if (response.opt().status200().isPresent()) {
+            return Optional.of(response.status200().payload());
+        } else {
+            System.out.printf("pipeline not found %s !\n", pipe.id());
+            return Optional.empty();
         }
     }
 
