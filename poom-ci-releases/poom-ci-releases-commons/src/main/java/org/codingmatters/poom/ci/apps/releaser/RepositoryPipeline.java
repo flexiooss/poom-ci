@@ -3,10 +3,9 @@ package org.codingmatters.poom.ci.apps.releaser;
 import com.fasterxml.jackson.core.JsonFactory;
 import org.codingmatters.poom.ci.pipeline.api.*;
 import org.codingmatters.poom.ci.pipeline.api.types.Pipeline;
+import org.codingmatters.poom.ci.pipeline.api.types.pipeline.Status;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIRequesterClient;
-import org.codingmatters.poom.services.support.Env;
-import org.codingmatters.rest.api.ResponseDelegate;
 import org.codingmatters.rest.api.client.okhttp.OkHttpClientWrapper;
 import org.codingmatters.rest.api.client.okhttp.OkHttpRequesterFactory;
 
@@ -15,6 +14,9 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 public class RepositoryPipeline {
+    static private final long DEFAULT_POLL_INTERVAL = 2000L;
+    static private final int DEFAULT_MAX_CONSECUTIVE_UPDATE_FAILURES = 30;
+
     private final String repo;
     private final String branch;
     private final PoomCIPipelineAPIClient client;
@@ -57,7 +59,7 @@ public class RepositoryPipeline {
             }
         } while (tries < 10);
 
-        if(lastException == null) {
+        if (lastException == null) {
             throw new IOException("failed to retrieve pipeline, response was : " + response);
         } else {
             throw new IOException("failed to retrieve pipeline, response was : " + response, lastException);
@@ -67,12 +69,12 @@ public class RepositoryPipeline {
     public Optional<Pipeline> updated(Pipeline pipe) {
         int tryCount = 0;
         PipelineGetResponse response = null;
-        while(response == null) {
+        while (response == null) {
             try {
                 response = this.client.pipelines().pipeline().get(PipelineGetRequest.builder().pipelineId(pipe.id()).build());
             } catch (IOException e) {
                 tryCount++;
-                if(tryCount >= 10) throw new RuntimeException("while waiting for pipeline retry count exceeded");
+                if (tryCount >= 10) throw new RuntimeException("while waiting for pipeline retry count exceeded");
                 try {
                     Thread.sleep(5 * 1000L);
                 } catch (InterruptedException ex) {
@@ -83,9 +85,33 @@ public class RepositoryPipeline {
         if (response.opt().status200().isPresent()) {
             return Optional.of(response.status200().payload());
         } else {
-            System.out.printf("pipeline not found %s !\n", pipe.id());
+            System.out.printf("pipeline %s not updated, unexpected response : %s\n", pipe.id(), response);
             return Optional.empty();
         }
+    }
+
+    public Pipeline awaitDone(Pipeline pipe) throws IOException, InterruptedException {
+        return this.awaitDone(pipe, DEFAULT_POLL_INTERVAL, DEFAULT_MAX_CONSECUTIVE_UPDATE_FAILURES);
+    }
+
+    public Pipeline awaitDone(Pipeline pipe, long pollInterval, int maxConsecutiveUpdateFailures) throws IOException, InterruptedException {
+        Pipeline current = pipe;
+        int consecutiveFailures = 0;
+        while (!current.opt().status().run().orElse(Status.Run.PENDING).equals(Status.Run.DONE)) {
+            Thread.sleep(pollInterval);
+            Optional<Pipeline> updated = this.updated(current);
+            if (updated.isPresent()) {
+                current = updated.get();
+                consecutiveFailures = 0;
+            } else {
+                consecutiveFailures++;
+                if (consecutiveFailures >= maxConsecutiveUpdateFailures) {
+                    throw new IOException(String.format(
+                            "pipeline %s update failed %s times in a row, giving up", current.id(), consecutiveFailures));
+                }
+            }
+        }
+        return current;
     }
 
     public static void main(String[] args) {
@@ -102,7 +128,7 @@ public class RepositoryPipeline {
 
         try {
             Optional<Pipeline> pipeline = new RepositoryPipeline("flexiooss/poom-ci", "develop", client).last(LocalDateTime.of(2020, 8, 28, 13, 00));
-            if(pipeline.isPresent()) {
+            if (pipeline.isPresent()) {
                 System.out.println("found " + pipeline);
             } else {
                 System.out.println("no pipeline found");

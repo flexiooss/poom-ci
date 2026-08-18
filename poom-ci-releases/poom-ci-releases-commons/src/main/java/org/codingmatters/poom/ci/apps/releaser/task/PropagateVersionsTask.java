@@ -13,7 +13,6 @@ import org.codingmatters.poom.ci.apps.releaser.graph.PropagationContext;
 import org.codingmatters.poom.ci.apps.releaser.hb.JsPackage;
 import org.codingmatters.poom.ci.apps.releaser.maven.Pom;
 import org.codingmatters.poom.ci.pipeline.api.types.Pipeline;
-import org.codingmatters.poom.ci.pipeline.api.types.pipeline.Status;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poom.services.support.date.UTC;
@@ -96,10 +95,7 @@ public class PropagateVersionsTask implements Callable<ReleaseTaskResult> {
         }
 
         System.out.printf("waiting for pipeline %s to finish...\n", pipe.get().opt().id().orElse("NONE"));
-        while (!pipe.get().opt().status().run().orElse(Status.Run.PENDING).equals(Status.Run.DONE)) {
-            Thread.sleep(2000L);
-            pipe = pipeline.updated(pipe.get());
-        }
+        pipeline.awaitDone(pipe.get());
     }
 
     private ProjectDescriptor readProjectDescriptor(File workspace) throws CommandFailed {

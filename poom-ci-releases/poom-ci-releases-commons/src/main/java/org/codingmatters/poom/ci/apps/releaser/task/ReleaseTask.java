@@ -10,7 +10,6 @@ import org.codingmatters.poom.ci.apps.releaser.maven.pom.ArtifactCoordinates;
 import org.codingmatters.poom.ci.pipeline.api.types.Pipeline;
 import org.codingmatters.poom.ci.pipeline.api.types.pipeline.Status;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
-import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.poom.services.support.date.UTC;
 
 import java.time.LocalDateTime;
@@ -54,12 +53,9 @@ public class ReleaseTask implements Callable<ReleaseTaskResult> {
         }
 
         System.out.println("waiting for release pipeline to finish...");
-        while (!pipe.get().opt().status().run().orElse(Status.Run.PENDING).equals(Status.Run.DONE)) {
-            Thread.sleep(2000L);
-            pipe = pipeline.updated(pipe.get());
-        }
+        Pipeline done = pipeline.awaitDone(pipe.get());
 
-        if (pipe.get().status().exit().equals(Status.Exit.SUCCESS)) {
+        if (done.status().exit().equals(Status.Exit.SUCCESS)) {
             return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, String.format("%s released to version %s", this.repository, releasedCoordinates), releasedCoordinates);
         } else {
             System.err.println("release failed !!");
