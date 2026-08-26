@@ -8,10 +8,18 @@ import java.io.File;
 public class GitRepository {
     private final CommandHelper commandHelper;
     private final File repository;
+    private final int pushAttempts;
+    private final long delayBetweenPushAttempts;
 
     public GitRepository(CommandHelper commandHelper, File repository) {
+        this(commandHelper, repository, Git.DEFAULT_CLONE_ATTEMPTS, Git.DEFAULT_DELAY_BETWEEN_CLONE_ATTEMPTS);
+    }
+
+    public GitRepository(CommandHelper commandHelper, File repository, int pushAttempts, long delayBetweenPushAttempts) {
         this.commandHelper = commandHelper;
         this.repository = repository;
+        this.pushAttempts = pushAttempts;
+        this.delayBetweenPushAttempts = delayBetweenPushAttempts;
     }
 
     public void checkout(String branch) throws CommandFailed {
@@ -51,6 +59,6 @@ public class GitRepository {
                 .directory(this.repository)
                 .command("git", "push")
                 ;
-        this.commandHelper.exec(processBuilder, "git push");
+        this.commandHelper.execWithRetry(processBuilder, "git push", this.pushAttempts, this.delayBetweenPushAttempts);
     }
 }
