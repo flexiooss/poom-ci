@@ -8,6 +8,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.List;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
@@ -68,6 +70,20 @@ public class HotfixTest {
 
         assertThat(this.helper.commands(), hasItem("flexio-flow hotfix start -D"));
         assertThat(this.helper.commands(), hasItem("flexio-flow hotfix finish -D"));
+    }
+
+    @Test
+    public void givenRepository__whenHotfixing__thenVersionIsReadFromMasterAfterFinish() throws Exception {
+        this.hotfix();
+
+        List<String> commands = this.helper.commands();
+        int finish = commands.indexOf("flexio-flow hotfix finish -D");
+        int checkout = commands.lastIndexOf("git checkout master");
+        int version = commands.lastIndexOf("flexio-flow version");
+
+        assertThat("hotfix finish must have run", finish, greaterThan(-1));
+        assertThat("master must be checked out after finish", checkout, greaterThan(finish));
+        assertThat("version must be read after being back on master", version, greaterThan(checkout));
     }
 
     @Test

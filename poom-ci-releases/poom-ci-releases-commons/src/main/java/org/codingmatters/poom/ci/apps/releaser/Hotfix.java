@@ -43,7 +43,6 @@ public class Hotfix {
         System.out.println("####################################################################################\n\n");
 
         flow.startHotfix();
-        String hotfixVersion = flow.version();
 
         if(! this.propagationContext.iEmpty()) {
             try {
@@ -66,6 +65,9 @@ public class Hotfix {
         System.out.println("####################################################################################\n\n");
 
         flow.finishHotfix();
+
+        repository.checkout("master");
+        String hotfixVersion = flow.version();
 
         ArtifactCoordinates result = new ArtifactCoordinates(coordinates.getGroupId(), coordinates.getArtifactId(), hotfixVersion);
 
