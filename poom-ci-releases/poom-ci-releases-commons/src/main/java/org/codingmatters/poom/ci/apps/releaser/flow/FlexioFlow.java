@@ -40,6 +40,22 @@ public class FlexioFlow {
         this.commandHelper.exec(processBuilder, "flexio-flow release finish -D");
     }
 
+    public void startHotfix() throws CommandFailed {
+        ProcessBuilder processBuilder = new ProcessBuilder()
+                .directory(this.repository)
+                .command("flexio-flow", "hotfix", "start", "-D")
+                ;
+        this.commandHelper.exec(processBuilder, "flexio-flow hotfix start -D");
+    }
+
+    public void finishHotfix() throws CommandFailed {
+        ProcessBuilder processBuilder = new ProcessBuilder()
+                .directory(this.repository)
+                .command("flexio-flow", "hotfix", "finish", "-D")
+                ;
+        this.commandHelper.exec(processBuilder, "flexio-flow hotfix finish -D");
+    }
+
     public void commit(String message) throws CommandFailed {
         ProcessBuilder processBuilder = new ProcessBuilder()
                 .directory(this.repository)
