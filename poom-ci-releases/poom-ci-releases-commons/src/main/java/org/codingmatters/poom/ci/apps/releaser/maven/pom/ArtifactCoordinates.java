@@ -64,6 +64,22 @@ public class ArtifactCoordinates {
                 '}';
     }
 
+    static public ArtifactCoordinates from(String coordinates) {
+        if(coordinates == null) {
+            throw new IllegalArgumentException("not a maven coordinate : null");
+        }
+        String[] parts = coordinates.split(":", -1);
+        if(parts.length != 3) {
+            throw new IllegalArgumentException("not a maven coordinate, expected groupId:artifactId:version : " + coordinates);
+        }
+        for (String part : parts) {
+            if(part.trim().isEmpty()) {
+                throw new IllegalArgumentException("not a maven coordinate, empty segment : " + coordinates);
+            }
+        }
+        return new ArtifactCoordinates(parts[0].trim(), parts[1].trim(), parts[2].trim());
+    }
+
     public String coodinates() {
         return String.format("%s:%s:%s", this.getGroupId(), this.getArtifactId(), this.getVersion());
     }
