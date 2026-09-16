@@ -15,12 +15,12 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class ReleaseGraphTask extends AbstractGraphTask implements Callable<GraphTaskResult> {
-    static private final CategorizedLogger log = CategorizedLogger.getLogger(ReleaseGraphTask.class);
+public class HotfixGraphTask extends AbstractGraphTask implements Callable<GraphTaskResult> {
+    static private final CategorizedLogger log = CategorizedLogger.getLogger(HotfixGraphTask.class);
 
     private final PropagationContext propagationContext;
 
-    public ReleaseGraphTask(
+    public HotfixGraphTask(
             List<RepositoryGraphDescriptor> descriptorList,
             PropagationContext propagationContext,
             CommandHelper commandHelper,
@@ -35,22 +35,21 @@ public class ReleaseGraphTask extends AbstractGraphTask implements Callable<Grap
 
     @Override
     public GraphTaskResult call() throws Exception {
-//        ExecutorService pool = Executors.newFixedThreadPool(WALKER_THREAD_COUNT);
         ExecutorService pool = Executors.newCachedThreadPool();
         try {
-            log.info("starting release-graph for {}", this.descriptorList);
-            notifier.notify("release-graph", "START", this.formattedRepositoryList(descriptorList));
-            GraphWalker.WalkerTaskProvider walkerTaskProvider = (repository, context) -> new ReleaseTask(repository, githubRepositoryUrlProvider, context, commandHelper, client, workspace);
+            log.info("starting hotfix-graph for {}", this.descriptorList);
+            notifier.notify("hotfix-graph", "START", this.formattedRepositoryList(descriptorList));
+            GraphWalker.WalkerTaskProvider walkerTaskProvider = (repository, context) -> new HotfixTask(repository, githubRepositoryUrlProvider, context, commandHelper, client, workspace);
 
             for (RepositoryGraphDescriptor descriptor : descriptorList) {
                 walkGraph(descriptor, this.propagationContext, pool, walkerTaskProvider);
             }
 
-            notifier.notify("release-graph", "DONE", this.propagationContext.text());
-            return new GraphTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, "Finished releasing graphs", this.propagationContext);
+            notifier.notify("hotfix-graph", "DONE", this.propagationContext.text());
+            return new GraphTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, "Finished hotfixing graphs", this.propagationContext);
         } finally {
             pool.shutdownNow();
-            log.info("release-graph for {} done", this.descriptorList);
+            log.info("hotfix-graph for {} done", this.descriptorList);
         }
     }
 }
