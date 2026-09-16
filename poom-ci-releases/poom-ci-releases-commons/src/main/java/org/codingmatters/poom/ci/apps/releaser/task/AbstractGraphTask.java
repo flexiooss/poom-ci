@@ -49,7 +49,11 @@ public class AbstractGraphTask {
         if(propagationContext == null || propagationContext.iEmpty()) {
             return "";
         }
-        return "\n\nPropagated versions :\n" + propagationContext.text();
+        return "Propagated versions :\n" + propagationContext.text() + "\n";
+    }
+
+    static public String formattedStartMessage(String repositoryList, PropagationContext propagationContext) {
+        return formattedPropagatedVersions(propagationContext) + repositoryList;
     }
 
     protected String formattedRepositoryList(List<RepositoryGraphDescriptor> descriptorList) {

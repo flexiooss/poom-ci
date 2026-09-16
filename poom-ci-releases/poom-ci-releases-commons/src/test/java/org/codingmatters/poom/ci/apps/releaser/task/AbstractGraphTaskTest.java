@@ -33,10 +33,34 @@ public class AbstractGraphTaskTest {
     }
 
     @Test
-    public void givenContextWithOneArtifact__whenFormattingPropagatedVersions__thenStartsWithABlankLine() throws Exception {
+    public void givenContextWithOneArtifact__whenFormattingPropagatedVersions__thenStartsWithTheHeader() throws Exception {
+        assertThat(AbstractGraphTask.formattedPropagatedVersions(this.oneArtifact()), startsWith("Propagated versions :"));
+    }
+
+    @Test
+    public void givenContextWithOneArtifact__whenFormattingPropagatedVersions__thenEndsWithABlankLine() throws Exception {
+        assertThat(AbstractGraphTask.formattedPropagatedVersions(this.oneArtifact()), endsWith("\n\n"));
+    }
+
+    @Test
+    public void givenStartMessage__whenContextIsNotEmpty__thenPropagatedVersionsComeBeforeRepositories() throws Exception {
+        String actual = AbstractGraphTask.formattedStartMessage("Repositories :\n   - Flexio-corp/a-project", this.oneArtifact());
+
+        assertThat(actual.indexOf("Propagated versions :"), is(0));
+        assertThat(actual.indexOf("Propagated versions :"), lessThan(actual.indexOf("Repositories :")));
+    }
+
+    @Test
+    public void givenStartMessage__whenContextIsEmpty__thenOnlyRepositories() throws Exception {
+        assertThat(
+                AbstractGraphTask.formattedStartMessage("Repositories :\n   - Flexio-corp/a-project", new PropagationContext()),
+                is("Repositories :\n   - Flexio-corp/a-project")
+        );
+    }
+
+    private PropagationContext oneArtifact() {
         PropagationContext context = new PropagationContext();
         context.addPropagatedArtifact(ArtifactCoordinates.from("io.flexio:flexio-service-parent:1.617.0"));
-
-        assertThat(AbstractGraphTask.formattedPropagatedVersions(context), startsWith("\n\n"));
+        return context;
     }
 }
