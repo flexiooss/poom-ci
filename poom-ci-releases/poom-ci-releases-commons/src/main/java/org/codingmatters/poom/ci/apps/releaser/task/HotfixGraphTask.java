@@ -38,7 +38,7 @@ public class HotfixGraphTask extends AbstractGraphTask implements Callable<Graph
         ExecutorService pool = Executors.newCachedThreadPool();
         try {
             log.info("starting hotfix-graph for {}", this.descriptorList);
-            notifier.notify("hotfix-graph", "START", this.formattedRepositoryList(descriptorList));
+            notifier.notify("hotfix-graph", "START", this.formattedRepositoryList(descriptorList) + formattedPropagatedVersions(this.propagationContext));
             GraphWalker.WalkerTaskProvider walkerTaskProvider = (repository, context) -> new HotfixTask(repository, githubRepositoryUrlProvider, context, commandHelper, client, workspace);
 
             for (RepositoryGraphDescriptor descriptor : descriptorList) {

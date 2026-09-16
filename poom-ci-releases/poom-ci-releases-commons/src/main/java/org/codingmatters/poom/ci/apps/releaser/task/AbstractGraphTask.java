@@ -45,6 +45,13 @@ public class AbstractGraphTask {
         this.graphTaskListener = graphTaskListener;
     }
 
+    static public String formattedPropagatedVersions(PropagationContext propagationContext) {
+        if(propagationContext == null || propagationContext.iEmpty()) {
+            return "";
+        }
+        return "\n\nPropagated versions :\n" + propagationContext.text();
+    }
+
     protected String formattedRepositoryList(List<RepositoryGraphDescriptor> descriptorList) {
         StringBuilder result = new StringBuilder();
         result.append("Repositories :");

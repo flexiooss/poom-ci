@@ -39,7 +39,7 @@ public class ReleaseGraphTask extends AbstractGraphTask implements Callable<Grap
         ExecutorService pool = Executors.newCachedThreadPool();
         try {
             log.info("starting release-graph for {}", this.descriptorList);
-            notifier.notify("release-graph", "START", this.formattedRepositoryList(descriptorList));
+            notifier.notify("release-graph", "START", this.formattedRepositoryList(descriptorList) + formattedPropagatedVersions(this.propagationContext));
             GraphWalker.WalkerTaskProvider walkerTaskProvider = (repository, context) -> new ReleaseTask(repository, githubRepositoryUrlProvider, context, commandHelper, client, workspace);
 
             for (RepositoryGraphDescriptor descriptor : descriptorList) {
