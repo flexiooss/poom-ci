@@ -56,7 +56,6 @@ public class HotfixTask implements Callable<ReleaseTaskResult> {
             return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, String.format("%s hotfixed to version %s", this.repository, hotfixedCoordinates), hotfixedCoordinates);
         } else {
             System.err.println("hotfix failed !!");
-            System.exit(1);
             return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.FAILURE, String.format("%s hotfix failed", this.repository), null);
         }
     }
