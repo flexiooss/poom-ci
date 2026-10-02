@@ -1,0 +1,6 @@
+---
+repositories:
+  - org/low
+then:
+  - repositories: [org/leaf-a]
+  - repositories: [org/leaf-b]
