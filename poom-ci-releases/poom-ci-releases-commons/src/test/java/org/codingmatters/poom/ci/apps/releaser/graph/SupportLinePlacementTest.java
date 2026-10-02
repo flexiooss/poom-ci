@@ -72,14 +72,20 @@ public class SupportLinePlacementTest {
     }
 
     @Test
-    public void givenRepositoryAbsentFromEveryGraph__whenChecking__thenFailsNamingIt() throws Exception {
-        try {
-            SupportLinePlacement.check(
-                    this.tagVersions("---\norg/typo: \"1.29.0\"\n"),
-                    this.graph("graphs/support-terminal.yml"));
-            fail("expected IllegalArgumentException");
-        } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage(), containsString("org/typo"));
-        }
+    public void givenRepositoryAbsentFromEveryGraph__whenChecking__thenNothingRaised() throws Exception {
+        SupportLinePlacement.check(
+                this.tagVersions("---\norg/typo: \"1.29.0\"\n"),
+                this.graph("graphs/support-terminal.yml"));
+    }
+
+    @Test
+    public void givenGraphFilteredByFrom__whenAListedRepositoryFellOut__thenNothingRaised() throws Exception {
+        List<RepositoryGraphDescriptor> filtered = Collections.singletonList(
+                RepositoryGraphDescriptor.fromYaml(
+                        Thread.currentThread().getContextClassLoader()
+                                .getResourceAsStream("graphs/support-with-successors.yml"))
+                        .subgraph("org/middle"));
+
+        SupportLinePlacement.check(this.tagVersions("---\norg/low: \"1.29.0\"\n"), filtered);
     }
 }

@@ -24,9 +24,9 @@ public class SupportLinePlacement {
             }
 
             if(! found) {
-                throw new IllegalArgumentException(String.format(
-                        "%s is listed in --from-tag-version but appears in no graph, check its name",
-                        repository));
+                System.out.printf(
+                        "%s is listed in --from-tag-version but appears in no graph being released : it will not be touched. Check its name, or ignore this if --from trimmed it out.%n",
+                        repository);
             }
             if(! successors.isEmpty()) {
                 throw new IllegalArgumentException(String.format(
