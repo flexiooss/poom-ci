@@ -59,7 +59,6 @@ public class ReleaseTask implements Callable<ReleaseTaskResult> {
             return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, String.format("%s released to version %s", this.repository, releasedCoordinates), releasedCoordinates);
         } else {
             System.err.println("release failed !!");
-            System.exit(1);
             return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.FAILURE, String.format("%s release failed", this.repository), null);
         }
     }
