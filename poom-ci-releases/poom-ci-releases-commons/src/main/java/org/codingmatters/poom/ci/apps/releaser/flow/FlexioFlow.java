@@ -56,6 +56,22 @@ public class FlexioFlow {
         this.commandHelper.exec(processBuilder, "flexio-flow hotfix finish -D");
     }
 
+    public void startSupportBranch(String tag) throws CommandFailed {
+        ProcessBuilder processBuilder = new ProcessBuilder()
+                .directory(this.repository)
+                .command("flexio-flow", "support-branch", "start", "--from-tag=" + tag, "-D")
+                ;
+        this.commandHelper.exec(processBuilder, "flexio-flow support-branch start --from-tag=" + tag + " -D");
+    }
+
+    public void finishSupportBranch() throws CommandFailed {
+        ProcessBuilder processBuilder = new ProcessBuilder()
+                .directory(this.repository)
+                .command("flexio-flow", "support-branch", "finish", "--merge", "-D")
+                ;
+        this.commandHelper.exec(processBuilder, "flexio-flow support-branch finish --merge -D");
+    }
+
     public void commit(String message) throws CommandFailed {
         ProcessBuilder processBuilder = new ProcessBuilder()
                 .directory(this.repository)
