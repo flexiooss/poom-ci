@@ -1,0 +1,6 @@
+---
+repositories:
+  - org/low
+  - org/middle
+then:
+  - repositories: [org/leaf-a]

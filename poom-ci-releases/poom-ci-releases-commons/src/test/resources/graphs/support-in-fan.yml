@@ -1,0 +1,5 @@
+---
+repositories:
+  - org/leaf-a
+then:
+  - repositories: [org/leaf-b]

@@ -9,6 +9,8 @@ import org.codingmatters.poom.ci.apps.releaser.graph.GraphWalker;
 import org.codingmatters.poom.ci.apps.releaser.graph.PropagatedVersions;
 import org.codingmatters.poom.ci.apps.releaser.graph.PropagationContext;
 import org.codingmatters.poom.ci.apps.releaser.graph.descriptors.RepositoryGraph;
+import org.codingmatters.poom.ci.apps.releaser.graph.SupportLinePlacement;
+import org.codingmatters.poom.ci.apps.releaser.graph.TagVersions;
 import org.codingmatters.poom.ci.apps.releaser.graph.descriptors.RepositoryGraphDescriptor;
 import org.codingmatters.poom.ci.apps.releaser.notify.Notifier;
 import org.codingmatters.poom.ci.apps.releaser.task.*;
@@ -141,12 +143,17 @@ public class App {
                 if (arguments.argumentCount() < 1) {
                     usageAndFail(args);
                 }
-                failIfFromTagVersionRequested(arguments);
                 try {
                     List<RepositoryGraphDescriptor> descriptorList = buildFilteredGraphDescriptorList(arguments);
-                    System.out.println("Will hotfix dependency graphs : " + descriptorList);
+                    TagVersions tagVersions = tagVersionsFrom(arguments);
+                    SupportLinePlacement.check(tagVersions, descriptorList);
 
-                    GraphTaskResult result = new HotfixGraphTask(descriptorList, propagationContextFrom(arguments), commandHelper, client, workspace, notifier, GithubRepositoryUrlProvider.ssh(), graphTaskListener).call();
+                    System.out.println("Will hotfix dependency graphs : " + descriptorList);
+                    if(! tagVersions.isEmpty()) {
+                        System.out.println("From production tags : " + tagVersions.repositories());
+                    }
+
+                    GraphTaskResult result = new HotfixGraphTask(descriptorList, propagationContextFrom(arguments), tagVersions, commandHelper, client, workspace, notifier, GithubRepositoryUrlProvider.ssh(), graphTaskListener).call();
                     System.out.println("\n\n\n\n####################################################################################");
                     System.out.println("####################################################################################");
                     System.out.printf("%s, hotfixed versions are :\n", result.message());
@@ -263,23 +270,12 @@ public class App {
         return PropagatedVersions.from(new File(file));
     }
 
-    private static void failIfFromTagVersionRequested(Arguments arguments) {
-        if(arguments.option("from-tag-version").get() == null) {
-            return;
+    private static TagVersions tagVersionsFrom(Arguments arguments) throws IOException {
+        String file = arguments.option("from-tag-version").get();
+        if(file == null) {
+            return TagVersions.from(null);
         }
-        System.err.println(
-                "--from-tag-version n'est pas implémenté.\n" +
-                "\n" +
-                "flexio-flow ne sait pas démarrer un hotfix depuis une référence arbitraire :\n" +
-                "Hotfix/Start.py crée systématiquement la branche depuis master, et Finish.py\n" +
-                "refuse de terminer une branche en retard sur master (BranchHaveDiverged).\n" +
-                "\n" +
-                "Partir d'un tag suppose une branche de support, workflow que flexio-flow\n" +
-                "n'implémente pas encore.\n" +
-                "\n" +
-                "Relancez sans --from-tag-version pour hotfixer depuis master."
-        );
-        System.exit(2);
+        return TagVersions.from(new File(file));
     }
 
     private static void usageAndFail(String[] args) {
@@ -300,10 +296,10 @@ public class App {
         where.println("      --from                 : using the from option, one can start releasing from one point in the graph");
         where.println("      --propagated-versions  : yaml list of groupId:artifactId:version to propagate");
         where.println("   hotfix-graph {--from <repo name>} {--propagated-versions <file>} {--from-tag-version <file>} <graph files>");
-        where.println("      hotfixes repository graphs from master");
+        where.println("      hotfixes repository graphs from master, or from the production tag for repositories listed in --from-tag-version");
         where.println("      --from                 : using the from option, one can start hotfixing from one point in the graph");
         where.println("      --propagated-versions  : yaml list of groupId:artifactId:version to propagate");
-        where.println("      --from-tag-version     : NOT IMPLEMENTED, fails");
+        where.println("      --from-tag-version     : yaml map of org/repo: \"version\", hotfixes those from their production tag instead of master");
         where.println("   propagate-versions {--from <repo name>} {--branch <branch name, defaults to develop>} <graph files>");
         where.println("      propagate versions in the repository graphs (version from preceding repos are propagated to following)");
         where.println("      --from   : using the from option, one can start propagating from one point in the graph");

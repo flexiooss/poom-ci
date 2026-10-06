@@ -1,12 +1,12 @@
 package org.codingmatters.poom.ci.apps.releaser.task;
 
-import org.codingmatters.poom.ci.apps.releaser.Release;
 import org.codingmatters.poom.ci.apps.releaser.RepositoryPipeline;
+import org.codingmatters.poom.ci.apps.releaser.Support;
+import org.codingmatters.poom.ci.apps.releaser.SupportResult;
 import org.codingmatters.poom.ci.apps.releaser.Workspace;
 import org.codingmatters.poom.ci.apps.releaser.command.CommandHelper;
 import org.codingmatters.poom.ci.apps.releaser.git.GithubRepositoryUrlProvider;
 import org.codingmatters.poom.ci.apps.releaser.graph.PropagationContext;
-import org.codingmatters.poom.ci.apps.releaser.maven.pom.ArtifactCoordinates;
 import org.codingmatters.poom.ci.pipeline.api.types.Pipeline;
 import org.codingmatters.poom.ci.pipeline.api.types.pipeline.Status;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
@@ -16,20 +16,19 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
-public class ReleaseTask implements Callable<ReleaseTaskResult> {
+public class SupportTask implements Callable<ReleaseTaskResult> {
     private final String repository;
     private final String repositoryUrl;
+    private final String tag;
     private final PropagationContext propagationContext;
     private final CommandHelper commandHelper;
     private final PoomCIPipelineAPIClient client;
     private final Workspace workspace;
 
-    public ReleaseTask(String repository, GithubRepositoryUrlProvider githubRepositoryUrlProvider, CommandHelper commandHelper, PoomCIPipelineAPIClient client, Workspace workspace) {
-        this(repository, githubRepositoryUrlProvider, new PropagationContext(), commandHelper, client, workspace);
-    }
-    public ReleaseTask(String repository, GithubRepositoryUrlProvider githubRepositoryUrlProvider, PropagationContext propagationContext, CommandHelper commandHelper, PoomCIPipelineAPIClient client, Workspace workspace) {
+    public SupportTask(String repository, String tag, GithubRepositoryUrlProvider githubRepositoryUrlProvider, PropagationContext propagationContext, CommandHelper commandHelper, PoomCIPipelineAPIClient client, Workspace workspace) {
         this.repository = repository;
         this.repositoryUrl = githubRepositoryUrlProvider.url(repository);
+        this.tag = tag;
         this.propagationContext = propagationContext;
         this.commandHelper = commandHelper;
         this.client = client;
@@ -40,26 +39,26 @@ public class ReleaseTask implements Callable<ReleaseTaskResult> {
     public ReleaseTaskResult call() throws Exception {
         LocalDateTime start = UTC.now();
 
-        ArtifactCoordinates releasedCoordinates = new Release(this.repositoryUrl, this.propagationContext, this.commandHelper, this.workspace).initiate();
+        SupportResult supported = new Support(this.repositoryUrl, this.tag, this.propagationContext, this.commandHelper, this.workspace).initiate();
 
-        RepositoryPipeline pipeline = new RepositoryPipeline(this.repository, "master", this.client);
+        RepositoryPipeline pipeline = new RepositoryPipeline(this.repository, supported.branch(), this.client);
         Optional<Pipeline> pipe = pipeline.last(start);
         if (!pipe.isPresent()) {
-            System.out.println("Waiting for release pipeline to start...");
+            System.out.printf("Waiting for support pipeline to start on %s...\n", supported.branch());
             do {
                 Thread.sleep(2000L);
                 pipe = pipeline.last(start);
             } while (!pipe.isPresent());
         }
 
-        System.out.println("waiting for release pipeline to finish...");
+        System.out.println("waiting for support pipeline to finish...");
         Pipeline done = pipeline.awaitDone(pipe.get());
 
         if (done.status().exit().equals(Status.Exit.SUCCESS)) {
-            return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, String.format("%s released to version %s", this.repository, releasedCoordinates), releasedCoordinates);
+            return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.SUCCESS, String.format("%s supported from tag %s to version %s", this.repository, this.tag, supported.coordinates()), supported.coordinates());
         } else {
-            System.err.println("release failed !!");
-            return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.FAILURE, String.format("%s release failed", this.repository), null);
+            System.err.println("support failed !!");
+            return new ReleaseTaskResult(ReleaseTaskResult.ExitStatus.FAILURE, String.format("%s support failed", this.repository), null);
         }
     }
 }

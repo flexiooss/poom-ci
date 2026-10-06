@@ -39,4 +39,22 @@ public class FlexioFlowCommandTest {
 
         assertThat(helper.commands(), contains("flexio-flow release start -D"));
     }
+
+    @Test
+    public void givenFlow__whenStartingSupportBranch__thenFlexioFlowSupportBranchStartInvoked() throws Exception {
+        RecordingCommandHelper helper = new RecordingCommandHelper();
+
+        new FlexioFlow(this.dir.getRoot(), helper).startSupportBranch("1.29.0");
+
+        assertThat(helper.commands(), contains("flexio-flow support-branch start --from-tag=1.29.0 -D"));
+    }
+
+    @Test
+    public void givenFlow__whenFinishingSupportBranch__thenMergeIsExplicit() throws Exception {
+        RecordingCommandHelper helper = new RecordingCommandHelper();
+
+        new FlexioFlow(this.dir.getRoot(), helper).finishSupportBranch();
+
+        assertThat(helper.commands(), contains("flexio-flow support-branch finish --merge -D"));
+    }
 }
