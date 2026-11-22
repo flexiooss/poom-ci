@@ -9,75 +9,96 @@ import org.codingmatters.rest.api.processors.GuardedProcessor;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.util.Formatter;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.util.List;
 
+/**
+ * Checks the GitHub webhook signature before letting the request through.
+ * <p>
+ * X-Hub-Signature-256 (HMAC-SHA256) is checked when present ; X-Hub-Signature (HMAC-SHA1) is only used as a fallback
+ * when the SHA-256 header is absent. The HMAC is computed on the raw payload bytes and compared in constant time.
+ * Expected signatures are never logged : with them, anyone able to read the logs could forge a valid request for
+ * the payload they sent.
+ */
 public class GithubWebhookGuard extends GuardedProcessor {
 
     static private final CategorizedLogger log = CategorizedLogger.getLogger(GithubWebhookGuard.class);
-    static private final String HMAC_SHA1_ALGORITHM = "HmacSHA1";
 
-    private final String token;
+    static private final String SHA256_HEADER = "X-Hub-Signature-256";
+    static private final String SHA1_HEADER = "X-Hub-Signature";
+
+    private final byte[] secret;
 
     public GithubWebhookGuard(Processor guarded, String token) {
         super(guarded);
-        this.token = token;
+        this.secret = token == null ? new byte[0] : token.getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
     protected boolean passed(RequestDelegate request, ResponseDelegate response) throws IOException {
-        try {
-            String signature = this.signature(this.readPayload(request));
-            if(request.headers().get("X-Hub-Signature") != null && ! request.headers().get("X-Hub-Signature").isEmpty()) {
-                if(request.headers().get("X-Hub-Signature").get(0).equals("sha1=" + signature)) {
-                    return true;
-                } else {
-                    this.errorResponse(response, log.tokenized().error("signature doesn't match, expected sha1={} but was {}",
-                            signature,
-                            request.headers().get("X-Hub-Signature").get(0)));
-                }
-            } else {
-                this.errorResponse(response, log.tokenized().error("X-Hub-Signature not provided"));
-            }
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            this.errorResponse(response, log.tokenized().error("error verifying signature", e));
+        if (this.secret.length == 0) {
+            this.errorResponse(response, log.tokenized().error("webhook secret is not configured, refusing request"));
+            return false;
         }
-        return false;
+
+        String sha256Signature = this.header(request, SHA256_HEADER);
+        String sha1Signature = this.header(request, SHA1_HEADER);
+        if (sha256Signature == null && sha1Signature == null) {
+            this.errorResponse(response, log.tokenized().error("neither {} nor {} provided", SHA256_HEADER, SHA1_HEADER));
+            return false;
+        }
+
+        try {
+            byte[] payload = this.readPayload(request);
+            boolean valid = sha256Signature != null
+                    ? this.matches(sha256Signature, "sha256=", "HmacSHA256", payload)
+                    : this.matches(sha1Signature, "sha1=", "HmacSHA1", payload);
+            if (!valid) {
+                this.errorResponse(response, log.tokenized().error("{} signature doesn't match",
+                        sha256Signature != null ? SHA256_HEADER : SHA1_HEADER));
+            }
+            return valid;
+        } catch (GeneralSecurityException e) {
+            this.errorResponse(response, log.tokenized().error("error verifying signature", e));
+            return false;
+        }
+    }
+
+    private boolean matches(String provided, String prefix, String algorithm, byte[] payload) throws GeneralSecurityException {
+        Mac mac = Mac.getInstance(algorithm);
+        mac.init(new SecretKeySpec(this.secret, algorithm));
+        byte[] expected = (prefix + toHexString(mac.doFinal(payload))).getBytes(StandardCharsets.US_ASCII);
+        return MessageDigest.isEqual(expected, provided.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private String header(RequestDelegate request, String name) {
+        List<String> values = request.headers().get(name);
+        if (values == null || values.isEmpty() || values.get(0) == null || values.get(0).isEmpty()) {
+            return null;
+        }
+        return values.get(0);
+    }
+
+    private byte[] readPayload(RequestDelegate request) throws IOException {
+        try (InputStream payload = request.payload()) {
+            return payload.readAllBytes();
+        }
     }
 
     private void errorResponse(ResponseDelegate response, String errorToken) {
         response.contenType("text/plain");
         response.status(403);
-        response.payload(String.format("signature doesn't match, see logs (%s)", errorToken).getBytes());
+        response.payload(String.format("signature doesn't match, see logs (%s)", errorToken).getBytes(StandardCharsets.UTF_8));
     }
 
-    private String readPayload(RequestDelegate request) throws IOException {
-        try(Reader reader = new InputStreamReader(request.payload())) {
-            StringBuilder payloadBuilder = new StringBuilder();
-            char[] buffer = new char[1024];
-            for(int read = reader.read(buffer) ; read != -1 ; read = reader.read(buffer)) {
-                payloadBuilder.append(buffer, 0, read);
-            }
-            return payloadBuilder.toString();
-        }
-    }
-
-    private String signature(String payload) throws NoSuchAlgorithmException, InvalidKeyException {
-        SecretKeySpec signingKey = new SecretKeySpec(this.token.getBytes(), HMAC_SHA1_ALGORITHM);
-        Mac mac = Mac.getInstance(HMAC_SHA1_ALGORITHM);
-        mac.init(signingKey);
-        return this.toHexString(mac.doFinal(payload.getBytes()));
-    }
-
-
-    private String toHexString(byte[] bytes) {
-        Formatter formatter = new Formatter();
+    private static String toHexString(byte[] bytes) {
+        StringBuilder hex = new StringBuilder(bytes.length * 2);
         for (byte b : bytes) {
-            formatter.format("%02x", b);
+            hex.append(String.format("%02x", b));
         }
-        return formatter.toString();
+        return hex.toString();
     }
 }
