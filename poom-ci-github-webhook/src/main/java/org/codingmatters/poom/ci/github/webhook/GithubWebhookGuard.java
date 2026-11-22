@@ -8,12 +8,14 @@ import org.codingmatters.rest.api.processors.GuardedProcessor;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Checks the GitHub webhook signature before letting the request through.
@@ -22,6 +24,9 @@ import java.util.List;
  * when the SHA-256 header is absent. The HMAC is computed on the raw payload bytes and compared in constant time.
  * Expected signatures are never logged : with them, anyone able to read the logs could forge a valid request for
  * the payload they sent.
+ * <p>
+ * The payload is read once and handed to the guarded processor from memory : the runtime's request delegate cannot be
+ * read twice for small payloads.
  */
 public class GithubWebhookGuard extends GuardedProcessor {
 
@@ -35,6 +40,15 @@ public class GithubWebhookGuard extends GuardedProcessor {
     public GithubWebhookGuard(Processor guarded, String token) {
         super(guarded);
         this.secret = token == null ? new byte[0] : token.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public void process(RequestDelegate request, ResponseDelegate response) throws IOException {
+        byte[] payload;
+        try (InputStream in = request.payload()) {
+            payload = in.readAllBytes();
+        }
+        super.process(new BufferedPayloadRequest(request, payload), response);
     }
 
     @Override
@@ -85,6 +99,66 @@ public class GithubWebhookGuard extends GuardedProcessor {
     private byte[] readPayload(RequestDelegate request) throws IOException {
         try (InputStream payload = request.payload()) {
             return payload.readAllBytes();
+        }
+    }
+
+    static private class BufferedPayloadRequest implements RequestDelegate {
+        private final RequestDelegate delegate;
+        private final byte[] payload;
+
+        BufferedPayloadRequest(RequestDelegate delegate, byte[] payload) {
+            this.delegate = delegate;
+            this.payload = payload;
+        }
+
+        @Override
+        public InputStream payload() {
+            return new ByteArrayInputStream(this.payload);
+        }
+
+        @Override
+        public String path() {
+            return this.delegate.path();
+        }
+
+        @Override
+        public java.util.regex.Matcher pathMatcher(String regex) {
+            return this.delegate.pathMatcher(regex);
+        }
+
+        @Override
+        public Method method() {
+            return this.delegate.method();
+        }
+
+        @Override
+        public String contentType() {
+            return this.delegate.contentType();
+        }
+
+        @Override
+        public Map<String, List<String>> uriParameters(String pathExpression) {
+            return this.delegate.uriParameters(pathExpression);
+        }
+
+        @Override
+        public Map<String, List<String>> queryParameters() {
+            return this.delegate.queryParameters();
+        }
+
+        @Override
+        public Map<String, List<String>> headers() {
+            return this.delegate.headers();
+        }
+
+        @Override
+        public String absolutePath(String relative) {
+            return this.delegate.absolutePath(relative);
+        }
+
+        @Override
+        public void close() throws Exception {
+            this.delegate.close();
         }
     }
 

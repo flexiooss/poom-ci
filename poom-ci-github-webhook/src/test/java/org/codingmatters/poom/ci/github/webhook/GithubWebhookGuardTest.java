@@ -27,6 +27,7 @@ public class GithubWebhookGuardTest {
             .getBytes(StandardCharsets.UTF_8);
 
     private final AtomicBoolean guardedCalled = new AtomicBoolean(false);
+    private byte[] payloadSeenByGuarded;
     private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
     private final Logger rootLogger = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
 
@@ -71,6 +72,22 @@ public class GithubWebhookGuardTest {
 
         assertThat(this.guardedCalled.get(), is(true));
         assertThat(response.status(), is(200));
+    }
+
+    @Test
+    public void givenOnlyWrongSha1Signature__whenProcessing__thenRefusedWith403() throws Exception {
+        TestResponseDeleguate response = this.process(SECRET, PAYLOAD, "X-Hub-Signature", "sha1=" + hmac("HmacSHA1", "other-secret", PAYLOAD));
+
+        assertThat(this.guardedCalled.get(), is(false));
+        assertThat(response.status(), is(403));
+    }
+
+    @Test
+    public void givenValidSignature__whenGuardedProcessorReadsPayload__thenItGetsTheWholePayload() throws Exception {
+        this.process(SECRET, PAYLOAD, "X-Hub-Signature-256", "sha256=" + hmac("HmacSHA256", SECRET, PAYLOAD));
+
+        assertThat(this.guardedCalled.get(), is(true));
+        assertThat(this.payloadSeenByGuarded, is(PAYLOAD));
     }
 
     @Test
@@ -119,6 +136,7 @@ public class GithubWebhookGuardTest {
     private TestResponseDeleguate process(String secret, byte[] payload, String... headerNamesAndValues) throws Exception {
         GithubWebhookGuard guard = new GithubWebhookGuard((request, response) -> {
             this.guardedCalled.set(true);
+            this.payloadSeenByGuarded = request.payload().readAllBytes();
             response.status(200);
         }, secret);
 
