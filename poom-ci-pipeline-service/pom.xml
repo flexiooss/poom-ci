@@ -86,6 +86,11 @@
             <artifactId>poom-services-test-support</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.flexio.commons</groupId>
+            <artifactId>flexio-mongo-tests</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
