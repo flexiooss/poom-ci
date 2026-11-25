@@ -98,7 +98,8 @@ public class PoomCIApisService {
                 jobRepository,
                 new RunnerInvokerListener(runnerClient, new DefaultRunnerClientFactory(jsonFactory, client), listenerPool),
                 null,
-                jsonFactory
+                jsonFactory,
+                account -> true
         );
     }
 }

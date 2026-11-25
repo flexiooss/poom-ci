@@ -24,6 +24,10 @@
             <artifactId>poomjobs-runner</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.codingmatters.poom</groupId>
+            <artifactId>poomjobs-runner-service</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.codingmatters.poom.ci</groupId>
             <artifactId>poom-ci-pipeline-api</artifactId>
         </dependency>

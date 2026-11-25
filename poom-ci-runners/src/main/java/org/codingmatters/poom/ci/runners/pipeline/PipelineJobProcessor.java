@@ -11,6 +11,7 @@ import org.codingmatters.poom.ci.pipeline.descriptors.StageHolder;
 import org.codingmatters.poom.ci.runners.pipeline.loggers.ClosableStageLogger;
 import org.codingmatters.poom.ci.runners.pipeline.loggers.DirectStageLogger;
 import org.codingmatters.poom.runner.JobProcessor;
+import org.codingmatters.poom.runner.exception.FailedJobTerminationException;
 import org.codingmatters.poom.runner.exception.JobProcessingException;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poom.services.support.Env;
@@ -80,6 +81,30 @@ public class PipelineJobProcessor implements JobProcessor {
         return this.job
                 .withStatus(Status.builder().run(Status.Run.DONE).exit(Status.Exit.SUCCESS).build())
                 .withProcessing(this.job.processing().withFinished(LocalDateTime.now(ZoneOffset.UTC.normalized())));
+    }
+
+    /**
+     * Appelé par le runner (poomjobs) pour un job resté en cours après l'arrêt brutal d'un runner :
+     * la pipeline correspondante est marquée terminée en échec.
+     */
+    @Override
+    public void terminateFailedJob(Job job) throws FailedJobTerminationException {
+        String pipelineId = job.opt().arguments().get(0).orElse(null);
+        if (pipelineId == null) {
+            log.info("failed job {} has no pipeline id, nothing to terminate", job.id());
+            return;
+        }
+        try {
+            PipelinePatchResponse response = this.pipelineAPIClient.pipelines().pipeline().patch(req -> req
+                    .pipelineId(pipelineId)
+                    .payload(term -> term.exit(PipelineTermination.Exit.FAILURE))
+            );
+            if (!response.opt().status200().isPresent()) {
+                throw new FailedJobTerminationException("failed terminating pipeline " + pipelineId + ", response was : " + response);
+            }
+        } catch (IOException e) {
+            throw new FailedJobTerminationException("failed terminating pipeline " + pipelineId + ", cannot access pipeline service", e);
+        }
     }
 
     private PipelineContext initializeContext() throws JobProcessingException, NotAPipelineContextException {

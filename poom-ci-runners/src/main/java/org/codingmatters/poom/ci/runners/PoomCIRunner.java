@@ -9,9 +9,8 @@ import org.codingmatters.poomjobs.client.PoomjobsJobRegistryAPIClient;
 import org.codingmatters.poomjobs.client.PoomjobsJobRegistryAPIRequesterClient;
 import org.codingmatters.poomjobs.client.PoomjobsRunnerRegistryAPIClient;
 import org.codingmatters.poomjobs.client.PoomjobsRunnerRegistryAPIRequesterClient;
-import org.codingmatters.poom.runner.GenericRunner;
-import org.codingmatters.poom.runner.configuration.RunnerConfiguration;
-import org.codingmatters.poom.runner.exception.RunnerInitializationException;
+import org.codingmatters.poom.jobs.runner.service.RunnerService;
+import org.codingmatters.poom.jobs.runner.service.exception.RunnerServiceInitializationException;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.rest.api.client.okhttp.OkHttpClientWrapper;
@@ -23,7 +22,6 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
-import java.util.concurrent.Executors;
 
 public class PoomCIRunner {
     static private final CategorizedLogger log = CategorizedLogger.getLogger(PoomCIRunner.class);
@@ -39,7 +37,7 @@ public class PoomCIRunner {
             System.exit(1);
         }
 
-        RunnerConfiguration configuration = new PoomCIRunner(
+        RunnerService runner = new PoomCIRunner(
                 Env.mandatory("JOB_REGISTRY_URL").asString(),
                 Env.mandatory("RUNNER_REGISTRY_URL").asString(),
                 Env.mandatory("PIPELINE_URL").asString(),
@@ -47,25 +45,17 @@ public class PoomCIRunner {
                 Env.mandatory(Env.SERVICE_PORT).asInteger(),
                 2,
                 keystore, Env.mandatory("KS_KEY_PASS").asString().toCharArray()
-        ).buildConfiguration();
+        ).buildRunner();
 
-
-
-        GenericRunner runner = new GenericRunner(configuration);
+        log.info("poom-ci runner starting");
         try {
-            runner.start();
-        } catch (RunnerInitializationException e) {
+            // bloquant jusqu'à l'arrêt du runner
+            runner.run();
+        } catch (RunnerServiceInitializationException e) {
             log.error("error starting poom-ci-runner", e);
             System.exit(1);
-        }
-
-        log.info("poom-ci runner started");
-        while(true) {
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                break;
-            }
+        } finally {
+            runner.stop();
         }
         log.info("poom-ci runner stopped");
     }
@@ -90,7 +80,7 @@ public class PoomCIRunner {
         this.keypass = keypass;
     }
 
-    private RunnerConfiguration buildConfiguration() {
+    private RunnerService buildRunner() {
         JsonFactory jsonFactory = new JsonFactory();
         YAMLFactory yamlFactory = new YAMLFactory();
 
@@ -111,32 +101,25 @@ public class PoomCIRunner {
                 jsonFactory,
                 this.pipelineUrl
         );
-        return RunnerConfiguration.builder()
-                .jobRegistryUrl(this.jobRegistryUrl)
-                .endpointHost(this.host)
-                .endpointPort(this.port)
+        if (!Env.optional(Env.SERVICE_URL).isPresent()) {
+            // RunnerService lit l'URL de callback dans SERVICE_URL ; GenericRunner la dérivait de l'hôte et du port.
+            System.setProperty("service.url", String.format("http://%s:%s", this.host, this.port));
+        }
 
-                .callbackBaseUrl(String.format("http://%s:%s", this.host, this.port))
-                .ttl(2 * 60 * 1000L)
-
-                .processorFactory(new PoomCIJobProcessorFactory(
+        return RunnerService.setup()
+                .jobs("poom-ci", new String[]{
+                        PoomCIJobProcessorFactory.triggerJobName(PipelineTrigger.Type.GITHUB_PUSH),
+                        PoomCIJobProcessorFactory.triggerJobName(PipelineTrigger.Type.UPSTREAM_BUILD)
+                }, new PoomCIJobProcessorFactory(
                         pipelineAPIClient,
                         yamlFactory,
                         this.keystore,
                         this.keypass,
                         jsonFactory))
-
-                .jobCategory("poom-ci")
-                .jobName(
-                        PoomCIJobProcessorFactory.triggerJobName(PipelineTrigger.Type.GITHUB_PUSH),
-                        PoomCIJobProcessorFactory.triggerJobName(PipelineTrigger.Type.UPSTREAM_BUILD)
-                )
-
-                .jobRegistryAPIClient(jobRegistryAPIClient)
-                .runnerRegistryAPIClient(runnerRegistryApi)
-
-                .jobWorker(Executors.newFixedThreadPool(this.workerPoolSize))
-
+                .clients(runnerRegistryApi, jobRegistryAPIClient)
+                .concurrency(this.workerPoolSize)
+                .endpoint(this.host, this.port)
+                .ttl(2 * 60 * 1000L)
                 .build();
     }
 }

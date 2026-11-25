@@ -36,7 +36,7 @@ public class PoomCIJobProcessorFactory implements JobProcessor.Factory {
     }
 
     @Override
-    public JobProcessor createFor(Job job) {
+    public JobProcessor createFor(Job job, JobProcessor.JobMonitor monitor) {
         if(this.hasTriggerType(PipelineTrigger.Type.GITHUB_PUSH, job)) {
             return new PipelineJobProcessor(job, new GithubPipelineContextProvider(this.pipelineClient, this.yamlFactory), this::shellExecutor, this.pipelineClient);
         } else if(this.hasTriggerType(PipelineTrigger.Type.UPSTREAM_BUILD, job)) {
