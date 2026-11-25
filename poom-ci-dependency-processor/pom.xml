@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.codingmatters.poom.ci</groupId>
         <artifactId>poom-ci</artifactId>
-        <version>2.35.0</version>
+        <version>2.36.0</version>
     </parent>
 
     <artifactId>poom-ci-dependency-processor</artifactId>
@@ -20,6 +20,11 @@
         <dependency>
             <groupId>org.codingmatters.rest</groupId>
             <artifactId>cdm-rest-api</artifactId>
+        </dependency>
+        <dependency>
+            <!-- annotations @WithSpan des processeurs générés par cdm-rest -->
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-instrumentation-annotations</artifactId>
         </dependency>
     </dependencies>
 
