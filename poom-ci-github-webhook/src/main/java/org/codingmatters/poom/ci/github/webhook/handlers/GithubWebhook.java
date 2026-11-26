@@ -4,6 +4,7 @@ import org.codingmatters.poom.ci.github.webhook.api.WebhookPostRequest;
 import org.codingmatters.poom.ci.github.webhook.api.WebhookPostResponse;
 import org.codingmatters.poom.ci.pipeline.api.optional.OptionalGithubTriggersPostResponse;
 import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIClient;
+import org.codingmatters.poom.ci.triggers.GithubPushEvent;
 import org.codingmatters.poom.ci.runners.pipeline.providers.gh.Ref;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 
@@ -22,6 +23,15 @@ public class GithubWebhook implements Function<WebhookPostRequest, WebhookPostRe
         this.prefixToIgnore = prefixToIgnore;
     }
 
+    /**
+     * GitHub signals a branch deletion as a push whose {@code after} is the null commit (forty zeros) : there is
+     * nothing to build, the branch no longer exists.
+     */
+    static boolean isBranchDeletion(GithubPushEvent event) {
+        String after = event == null ? null : event.after();
+        return after != null && after.length() == 40 && after.chars().allMatch(c -> c == '0');
+    }
+
     @Override
     public WebhookPostResponse apply(WebhookPostRequest request) {
         log.debug("received webhook : " + request.payload() + "(with ref " + request.payload().ref() + ")");
@@ -32,6 +42,12 @@ public class GithubWebhook implements Function<WebhookPostRequest, WebhookPostRe
                         .status202(status -> status.payload("Nothing to do : branch ignored due to its prefix !"))
                         .build();
             }
+        }
+        if (isBranchDeletion(request.payload())) {
+            log.info("ignoring branch deletion of {} ({})", request.payload().opt().repository().full_name().orElse("?"), request.payload().ref());
+            return WebhookPostResponse.builder()
+                    .status202(status -> status.payload("Nothing to do : branch deleted !"))
+                    .build();
         }
         try {
             OptionalGithubTriggersPostResponse pipelineResponse = this.pipelineClient.triggers().githubTriggers().post(req -> req.payload(request.payload())).opt();
