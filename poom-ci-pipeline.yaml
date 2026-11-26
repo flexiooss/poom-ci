@@ -1,8 +1,8 @@
 ---
 from:
   - url: git@github.com:Flexio-corp/pipeline-common-env.git
-    branch: develop
+    branch: feature/java-25-migration-1.31.0-dev
   - url: git@github.com:Flexio-corp/pipeline-oss-settings.git
     branch: develop
   - url: git@github.com:Flexio-corp/pipeline-maven.git
-    branch: develop
+    branch: feature/java-17-migration-1.0.0-dev#3
