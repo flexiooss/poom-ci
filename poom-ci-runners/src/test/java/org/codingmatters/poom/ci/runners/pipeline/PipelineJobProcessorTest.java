@@ -59,9 +59,15 @@ public class PipelineJobProcessorTest {
     }
 
     private final List<PipelinePatchRequest> pipelinePatchCalls = Collections.synchronizedList(new LinkedList<>());
+    private final java.util.concurrent.atomic.AtomicBoolean failRunningPatch = new java.util.concurrent.atomic.AtomicBoolean(false);
     private final java.util.concurrent.atomic.AtomicBoolean failExitPatch = new java.util.concurrent.atomic.AtomicBoolean(false);
     private PipelinePatchResponse pipelinePatch(PipelinePatchRequest request) {
         pipelinePatchCalls.add(request);
+        if (this.failRunningPatch.get() && request.payload().exit() == null) {
+            return PipelinePatchResponse.builder()
+                    .status500(status -> status.payload(error -> error.code(org.codingmatters.poom.ci.pipeline.api.types.Error.Code.UNEXPECTED_ERROR)))
+                    .build();
+        }
         if (this.failExitPatch.get() && request.payload().exit() != null) {
             return PipelinePatchResponse.builder()
                     .status500(status -> status.payload(error -> error.code(org.codingmatters.poom.ci.pipeline.api.types.Error.Code.UNEXPECTED_ERROR)))
@@ -255,5 +261,35 @@ public class PipelineJobProcessorTest {
 
         assertThat(this.pipelinePatchCalls, hasSize(2));
         assertThat(job.status().exit(), is(Status.Exit.SUCCESS));
+    }
+
+    @Test
+    public void givenRunningStatusCannotBeSet__thenPipelineIsNotTerminated() {
+        this.failRunningPatch.set(true);
+        try {
+            new PipelineJobProcessor(this.job(), this.noDescriptorProvider, this::testExecutor, this.pipelineClient).process();
+            org.junit.Assert.fail("expected a JobProcessingException");
+        } catch (JobProcessingException e) {
+            // attendu
+        }
+
+        assertThat(this.pipelinePatchCalls, hasSize(1));
+        assertThat(this.contextProviderCalls, hasSize(0));
+    }
+
+    @Test
+    public void givenContextProviderRuntimeFailure__thenPipelineTerminatedWithFailure_andExceptionRethrown() throws Exception {
+        PipelineContext.PipelineContextProvider brokenProvider = (pipelineId, trigger) -> {
+            throw new ArrayIndexOutOfBoundsException("malformed checkout spec");
+        };
+        try {
+            new PipelineJobProcessor(this.job(), brokenProvider, this::testExecutor, this.pipelineClient).process();
+            org.junit.Assert.fail("expected an ArrayIndexOutOfBoundsException");
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // attendu
+        }
+
+        assertThat(this.pipelinePatchCalls, hasSize(2));
+        assertThat(this.pipelinePatchCalls.get(1).payload().exit(), is(PipelineTermination.Exit.FAILURE));
     }
 }

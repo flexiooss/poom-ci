@@ -40,9 +40,14 @@ public class PipelineJobProcessor implements JobProcessor {
 
     @Override
     public Job process() throws JobProcessingException {
+        String pipelineId = this.job.arguments().get(0);
+        log.audit().info("starting pipeline {} execution", pipelineId);
+        // sans statut RUNNING posé, la pipeline n'est pas clôturée ici (elle reste à son état)
+        this.updatePipelineStatusToRunning(pipelineId);
+
         PipelineContext context = null;
         try {
-            context = this.initializeContext();
+            context = this.initializeContext(pipelineId);
         } catch (NotAPipelineContextException e) {
             log.info("ignoring job witch is not pointing to a pipeline context : {}", e.getMessage());
             // la pipeline, passée RUNNING, n'a rien à construire : elle est clôturée
@@ -51,9 +56,9 @@ public class PipelineJobProcessor implements JobProcessor {
                     .withStatus(Status.builder().run(Status.Run.DONE).exit(Status.Exit.SUCCESS).build())
                     .withResult("not a pipeline context")
                     .withProcessing(this.job.processing().withFinished(LocalDateTime.now(ZoneOffset.UTC.normalized())));
-        } catch (JobProcessingException e) {
-            // contexte impossible à préparer (checkout d'une branche supprimée, déclencheur illisible...) :
-            // la pipeline, passée RUNNING, est clôturée en échec
+        } catch (JobProcessingException | RuntimeException e) {
+            // contexte impossible à préparer (checkout d'une branche supprimée, déclencheur illisible,
+            // spécification de checkout mal formée...) : la pipeline, passée RUNNING, est clôturée en échec
             this.terminateWithoutContext(PipelineTermination.Exit.FAILURE);
             throw e;
         }
@@ -114,11 +119,7 @@ public class PipelineJobProcessor implements JobProcessor {
         }
     }
 
-    private PipelineContext initializeContext() throws JobProcessingException, NotAPipelineContextException {
-        String pipelineId = this.job.arguments().get(0);
-        log.audit().info("starting pipeline {} execution", pipelineId);
-        this.updatePipelineStatusToRunning(pipelineId);
-
+    private PipelineContext initializeContext(String pipelineId) throws JobProcessingException, NotAPipelineContextException {
         PipelineTrigger trigger = this.retrievePipelineTrigger(pipelineId);
         return this.createContext(pipelineId, trigger);
     }
