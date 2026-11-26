@@ -45,10 +45,17 @@ public class PipelineJobProcessor implements JobProcessor {
             context = this.initializeContext();
         } catch (NotAPipelineContextException e) {
             log.info("ignoring job witch is not pointing to a pipeline context : {}", e.getMessage());
+            // la pipeline, passée RUNNING, n'a rien à construire : elle est clôturée
+            this.terminateWithoutContext(PipelineTermination.Exit.SUCCESS);
             return this.job
                     .withStatus(Status.builder().run(Status.Run.DONE).exit(Status.Exit.SUCCESS).build())
                     .withResult("not a pipeline context")
                     .withProcessing(this.job.processing().withFinished(LocalDateTime.now(ZoneOffset.UTC.normalized())));
+        } catch (JobProcessingException e) {
+            // contexte impossible à préparer (checkout d'une branche supprimée, déclencheur illisible...) :
+            // la pipeline, passée RUNNING, est clôturée en échec
+            this.terminateWithoutContext(PipelineTermination.Exit.FAILURE);
+            throw e;
         }
 
 
@@ -244,6 +251,30 @@ public class PipelineJobProcessor implements JobProcessor {
                     context.pipelineId(), stage),
                     e);
             throw new JobProcessingException("error executing pipeline stage, see logs with error-token=" + errorToken);
+        }
+    }
+
+    /**
+     * Clôture la pipeline du job quand aucun contexte de build n'a pu être préparé. Au mieux : un échec
+     * est seulement journalisé, l'issue du job reste celle de la préparation du contexte.
+     */
+    private void terminateWithoutContext(PipelineTermination.Exit exit) {
+        String pipelineId = this.job.opt().arguments().get(0).orElse(null);
+        if (pipelineId == null) {
+            return;
+        }
+        try {
+            PipelinePatchResponse response = this.pipelineAPIClient.pipelines().pipeline().patch(req -> req
+                    .pipelineId(pipelineId)
+                    .payload(term -> term.exit(exit))
+            );
+            if (response.opt().status200().isPresent()) {
+                log.audit().info("pipeline {} without build context terminated with exit status {}", pipelineId, exit);
+            } else {
+                log.error("failed terminating pipeline {} without build context, response was : {}", pipelineId, response);
+            }
+        } catch (IOException e) {
+            log.error(String.format("failed terminating pipeline %s without build context, cannot access pipeline service", pipelineId), e);
         }
     }
 

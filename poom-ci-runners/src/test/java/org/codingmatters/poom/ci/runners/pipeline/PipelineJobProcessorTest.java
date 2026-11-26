@@ -9,6 +9,7 @@ import org.codingmatters.poom.ci.pipeline.descriptors.StageHolder;
 import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.poom.services.support.EnvProvider;
 import org.codingmatters.poom.services.tests.Eventually;
+import org.codingmatters.poom.runner.exception.JobProcessingException;
 import org.codingmatters.poomjobs.api.types.Job;
 import org.codingmatters.poomjobs.api.types.job.Status;
 import org.junit.Rule;
@@ -58,8 +59,14 @@ public class PipelineJobProcessorTest {
     }
 
     private final List<PipelinePatchRequest> pipelinePatchCalls = Collections.synchronizedList(new LinkedList<>());
+    private final java.util.concurrent.atomic.AtomicBoolean failExitPatch = new java.util.concurrent.atomic.AtomicBoolean(false);
     private PipelinePatchResponse pipelinePatch(PipelinePatchRequest request) {
         pipelinePatchCalls.add(request);
+        if (this.failExitPatch.get() && request.payload().exit() != null) {
+            return PipelinePatchResponse.builder()
+                    .status500(status -> status.payload(error -> error.code(org.codingmatters.poom.ci.pipeline.api.types.Error.Code.UNEXPECTED_ERROR)))
+                    .build();
+        }
         return PipelinePatchResponse.builder()
                 .status200(status -> status.payload(pipe -> pipe.status(st -> st.run(org.codingmatters.poom.ci.pipeline.api.types.pipeline.Status.Run.DONE))))
                 .build();
@@ -194,5 +201,59 @@ public class PipelineJobProcessorTest {
         } finally {
             EnvProvider.reset();
         }
+    }
+
+    private Job job() {
+        return Job.builder()
+                .category("poom-ci").name("pipeline").arguments("pipeline-id")
+                .status(status -> status.run(Status.Run.RUNNING))
+                .processing(processing -> processing.submitted(LocalDateTime.now(ZoneOffset.UTC.normalized()).minus(1, ChronoUnit.MINUTES)))
+                .build();
+    }
+
+    private final PipelineContext.PipelineContextProvider noDescriptorProvider = (pipelineId, trigger) -> {
+        throw new NotAPipelineContextException("/workspace/poom-ci-pipeline.yaml");
+    };
+
+    private final PipelineContext.PipelineContextProvider failingProvider = (pipelineId, trigger) -> {
+        throw new IOException("failed checking out a deleted branch");
+    };
+
+    @Test
+    public void givenNoPipelineDescriptor__thenPipelineTerminatedWithSuccess_andJobDoneSuccess() throws Exception {
+        Job job = new PipelineJobProcessor(this.job(), this.noDescriptorProvider, this::testExecutor, this.pipelineClient).process();
+
+        assertThat(this.pipelinePatchCalls, hasSize(2));
+        assertThat(this.pipelinePatchCalls.get(0).payload().run(), is(PipelineTermination.Run.RUNNING));
+        assertThat(this.pipelinePatchCalls.get(1).pipelineId(), is("pipeline-id"));
+        assertThat(this.pipelinePatchCalls.get(1).payload().exit(), is(PipelineTermination.Exit.SUCCESS));
+        assertThat(job.status().run(), is(Status.Run.DONE));
+        assertThat(job.status().exit(), is(Status.Exit.SUCCESS));
+        assertThat(job.result(), is("not a pipeline context"));
+        assertThat(this.stagePostCalls, hasSize(0));
+    }
+
+    @Test
+    public void givenContextInitializationFailure__thenPipelineTerminatedWithFailure_andJobProcessingExceptionThrown() {
+        try {
+            new PipelineJobProcessor(this.job(), this.failingProvider, this::testExecutor, this.pipelineClient).process();
+            org.junit.Assert.fail("expected a JobProcessingException");
+        } catch (JobProcessingException e) {
+            // attendu
+        }
+
+        assertThat(this.pipelinePatchCalls, hasSize(2));
+        assertThat(this.pipelinePatchCalls.get(1).payload().exit(), is(PipelineTermination.Exit.FAILURE));
+        assertThat(this.stagePostCalls, hasSize(0));
+    }
+
+    @Test
+    public void givenTerminationPatchFails__thenOriginalOutcomeKept() throws Exception {
+        this.failExitPatch.set(true);
+
+        Job job = new PipelineJobProcessor(this.job(), this.noDescriptorProvider, this::testExecutor, this.pipelineClient).process();
+
+        assertThat(this.pipelinePatchCalls, hasSize(2));
+        assertThat(job.status().exit(), is(Status.Exit.SUCCESS));
     }
 }
