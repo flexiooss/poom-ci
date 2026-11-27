@@ -12,6 +12,7 @@ import org.codingmatters.poom.ci.pipeline.client.PoomCIPipelineAPIRequesterClien
 import org.codingmatters.poom.containers.ApiContainerRuntime;
 import org.codingmatters.poom.containers.ApiContainerRuntimeBuilder;
 import org.codingmatters.poom.containers.runtime.netty.NettyApiContainerRuntime;
+import org.codingmatters.poom.containers.runtime.undertow.UndertowApiContainerRuntime;
 import org.codingmatters.poom.services.logging.CategorizedLogger;
 import org.codingmatters.poom.services.support.Env;
 import org.codingmatters.rest.api.RequestDelegate;
@@ -25,6 +26,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public class GithubWebhookService {
@@ -34,6 +36,9 @@ public class GithubWebhookService {
     static public final String GITHUB_SECRET_TOKEN = "GITHUB_SECRET_TOKEN";
     static public final String PIPELINE_API_URL = "PIPELINE_API_URL";
     static private final String PREFIX_IGNORE = "PREFIX_IGNORE";
+    static public final String API_CONTAINER_RUNTIME = "API_CONTAINER_RUNTIME";
+    static public final String UNDERTOW = "undertow";
+    static public final String NETTY = "netty";
 
     private final String token;
     private final PathHandler handlers;
@@ -59,11 +64,35 @@ public class GithubWebhookService {
                 new OkHttpRequesterFactory(OkHttpClientWrapper.build(), () -> pipelineUrl),
                 jsonFactory,
                 pipelineUrl);
-        ApiContainerRuntime runtime = new GithubWebhookService(host, port, token, jsonFactory, pipelineClient).runtime();
+        String runtimeName = Env.optional(API_CONTAINER_RUNTIME).map(Env.Var::asString).orElse(null);
+        ApiContainerRuntime runtime = new GithubWebhookService(host, port, token, jsonFactory, pipelineClient, runtimeName).runtime();
         runtime.main();
     }
 
+    /**
+     * Le runtime HTTP du service : {@code undertow} (défaut, valeur absente ou vide) ou {@code netty}, sans casse.
+     * <p>
+     * Undertow par défaut : le runtime Netty ne relit pas le corps d'une requête de moins de 30 Ko gardée en
+     * mémoire ({@code DynamicByteBuffer}). Le corps lu par {@link GithubWebhookGuard} pour la signature arrive
+     * alors vide au traitement du push, qui répond 200 sans créer de pipeline.
+     */
+    static ApiContainerRuntime containerRuntime(String name, String host, int port) {
+        String runtime = name == null || name.isBlank() ? UNDERTOW : name.trim().toLowerCase(Locale.ROOT);
+        switch (runtime) {
+            case UNDERTOW:
+                return new UndertowApiContainerRuntime(host, port, log);
+            case NETTY:
+                return new NettyApiContainerRuntime(host, port, log);
+            default:
+                throw new IllegalArgumentException(String.format("unknown %s : %s (expected %s or %s)", API_CONTAINER_RUNTIME, name, UNDERTOW, NETTY));
+        }
+    }
+
     public GithubWebhookService(String host, int port, String token, JsonFactory jsonFactory, PoomCIPipelineAPIClient pipelineClient) {
+        this(host, port, token, jsonFactory, pipelineClient, null);
+    }
+
+    public GithubWebhookService(String host, int port, String token, JsonFactory jsonFactory, PoomCIPipelineAPIClient pipelineClient, String runtimeName) {
         this.host = host;
         this.port = port;
         this.token = token;
@@ -79,8 +108,8 @@ public class GithubWebhookService {
                                         .with("ping", this::pong),
                                 this.token)
                 )
-                .withApi(new GithubWebhookApi(this.pipelineClient, prefixToTignore, this.jsonFactory))
-                .build(new NettyApiContainerRuntime(host, port, log));
+                .withApi(new GithubWebhookApi(this.pipelineClient, prefixToTignore == null ? List.of() : prefixToTignore, this.jsonFactory))
+                .build(containerRuntime(runtimeName, host, port));
     }
 
     public ApiContainerRuntime runtime() {
